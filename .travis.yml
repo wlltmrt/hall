@@ -1,0 +1,7 @@
+language: swift
+sudo: required
+
+osx_image: xcode11.2
+
+script:
+  - swift build
