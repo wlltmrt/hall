@@ -69,10 +69,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            #if DEBUG
-            print("[SQLite] Database Opened:", path)
-            traceStatements()
-            #endif
+            profiler?.debug("%s opened", path)
         }
     }
     
@@ -241,40 +238,13 @@ public final class SQLite {
         
         if result == 0 {
             result = Int(sqlite3_changes(databaseHandle))
-            
-            #if DEBUG
-            print("[SQLite] Changes:", result)
-            #endif
+            profiler?.debug("%d changes", result)
         }
         else {
             sqlite3_set_last_insert_rowid(databaseHandle, 0)
-            
-            #if DEBUG
-            print("[SQLite] Last Insert Id:", result)
-            #endif
+            profiler?.debug("%d created", result)
         }
         
         return result > 0 ? result : nil
     }
 }
-
-#if DEBUG
-extension SQLite {
-    private func traceStatements() {
-        sqlite3_trace_v2(databaseHandle, UInt32(SQLITE_TRACE_STMT), { (reason, context, p, x) -> CInt in
-            switch CInt(reason) {
-            case SQLITE_TRACE_STMT:
-                guard let statementHandle = OpaquePointer(p) else {
-                    return 0
-                }
-                
-                print("[SQLite] Query:", String(cString: sqlite3_expanded_sql(statementHandle)))
-                
-            default: break
-            }
-            
-            return 0
-        }, nil)
-    }
-}
-#endif
