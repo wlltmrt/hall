@@ -79,7 +79,7 @@ public final class SQLite {
     @discardableResult
     public func execute(_ query: Query) throws -> Int? {
         return try queue.sync {
-            let tracing = profiler?.begin("Execute")
+            let tracing = profiler?.begin("%{public}s", query.query)
             
             defer {
                 tracing?.end()
@@ -117,7 +117,7 @@ public final class SQLite {
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
         return try queue.sync {
-            let tracing = profiler?.begin("Fetch")
+            let tracing = profiler?.begin("%{public}s", query.query)
             
             defer {
                 tracing?.end()
@@ -158,7 +158,7 @@ public final class SQLite {
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
         return try queue.sync {
-            let tracing = profiler?.begin("FetchOnce")
+            let tracing = profiler?.begin("%{public}s", query.query)
             
             defer {
                 tracing?.end()
