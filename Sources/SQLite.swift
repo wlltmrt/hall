@@ -32,6 +32,12 @@ public enum SQLiteError: Error {
 }
 
 public final class SQLite {
+    public enum TransactionMode: String {
+        case deferred = "DEFERRED"
+        case exclusive = "EXCLUSIVE"
+        case immediate = "IMMEDIATE"
+    }
+    
     private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     
     public static let `default` = SQLite()
@@ -192,6 +198,19 @@ public final class SQLite {
         }
     }
     
+    public func transaction(_ mode: TransactionMode = .deferred, work: (_ sqlite: SQLite) throws -> Void) throws {
+        try execute("BEGIN \(mode.rawValue) TRANSACTION")
+        
+        do {
+            try work(self)
+            try execute("COMMIT TRANSACTION")
+        }
+        catch {
+            try execute("ROLLBACK TRANSACTION")
+            throw error
+        }
+    }
+    
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
         result = sqlite3_prepare_v2(databaseHandle, query, -1, &statementHandle, nil)
         return result == SQLITE_OK
@@ -230,6 +249,14 @@ public final class SQLite {
         
         if result == SQLITE_ERROR {
             throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+        }
+    }
+    
+    private func execute(_ query: String) throws {
+        try queue.sync {
+            if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
+                throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            }
         }
     }
     
