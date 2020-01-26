@@ -76,6 +76,8 @@ public final class SQLite {
             }
             
             profiler?.debug("%s opened", path)
+            
+            try execute("PRAGMA foreign_keys = ON")
         }
     }
     
@@ -230,6 +232,11 @@ public final class SQLite {
             
         case let character as Character:
             result = sqlite3_bind_int(statementHandle, index, CInt(UnicodeScalar(String(character))!.value))
+            
+        case let data as Data:
+            result = data.withUnsafeBytes {
+                sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), SQLite.SQLITE_TRANSIENT)
+            }
             
         case let date as Date:
             result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))

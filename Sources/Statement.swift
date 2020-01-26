@@ -40,6 +40,16 @@ public struct Statement {
     }
     
     @inlinable
+    public subscript(index: CInt) -> Data {
+        return Data(bytes: sqlite3_column_blob(handle, index), count: Int(sqlite3_column_bytes(handle, index)))
+    }
+    
+    @inlinable
+    public subscript(index: CInt) -> Data? {
+        return isNull(index) ? nil : Data(bytes: sqlite3_column_blob(handle, index), count: Int(sqlite3_column_bytes(handle, index)))
+    }
+    
+    @inlinable
     public subscript(index: CInt) -> Date {
         return Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_int64(handle, index)))
     }

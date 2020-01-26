@@ -30,6 +30,9 @@ public protocol SQLiteValue {
 extension Bool: SQLiteValue {
 }
 
+extension Data: SQLiteValue {
+}
+
 extension Date: SQLiteValue {
 }
 
