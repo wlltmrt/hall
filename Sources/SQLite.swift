@@ -47,7 +47,7 @@ public final class SQLite {
     private let queue: DispatchQueue
     
     private init() {
-        queue = DispatchQueue(label: "com.sqlite.queue") //, qos: .utility, attributes: .concurrent)
+        queue = DispatchQueue(label: "com.sqlite.queue", qos: .utility, attributes: .concurrent)
     }
     
     deinit {
@@ -75,7 +75,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            profiler?.debug("%s opened", path)
+            //profiler?.debug("%s opened", path)
             
             try execute("PRAGMA foreign_keys = ON")
         }
