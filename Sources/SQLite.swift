@@ -75,9 +75,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            profiler?.debug("Opened: \(path)")
-            
-            try execute("PRAGMA foreign_keys = ON")
+            try executeQuery("PRAGMA foreign_keys = ON")
         }
     }
     
@@ -85,10 +83,6 @@ public final class SQLite {
     public func execute(_ query: Query) throws -> Int? {
         return try queue.sync {
             let tracing = profiler?.begin(name: "Execute", query.query)
-            
-            defer {
-                tracing?.end()
-            }
             
             var statementHandle: OpaquePointer? = nil
             var result: CInt = 0
@@ -116,7 +110,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
             }
             
-            return executeResult()
+            return executeResult(tracing: tracing)
         }
     }
     
@@ -201,14 +195,14 @@ public final class SQLite {
     }
     
     public func transaction(_ mode: TransactionMode = .deferred, work: (_ sqlite: SQLite) throws -> Void) throws {
-        try execute("BEGIN \(mode.rawValue) TRANSACTION")
+        try executeQuery("BEGIN \(mode.rawValue) TRANSACTION")
         
         do {
             try work(self)
-            try execute("COMMIT TRANSACTION")
+            try executeQuery("COMMIT TRANSACTION")
         }
         catch {
-            try execute("ROLLBACK TRANSACTION")
+            try executeQuery("ROLLBACK TRANSACTION")
             throw error
         }
     }
@@ -259,30 +253,24 @@ public final class SQLite {
         }
     }
     
-    private func execute(_ query: String) throws {
+    private func executeQuery(_ query: String) throws {
         try queue.sync {
-            let tracing = profiler?.begin(name: "Execute", query)
-            
-            defer {
-                tracing?.end()
-            }
-            
             if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
                 throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
             }
         }
     }
     
-    private func executeResult() -> Int? {
+    private func executeResult(tracing: Profiler.Tracing?) -> Int? {
         var result = Int(sqlite3_last_insert_rowid(databaseHandle))
         
         if result == 0 {
             result = Int(sqlite3_changes(databaseHandle))
-            profiler?.debug("\(result) changes")
+            tracing?.end("\(result) changes")
         }
         else {
             sqlite3_set_last_insert_rowid(databaseHandle, 0)
-            profiler?.debug("Last insert id: \(result)")
+            tracing?.end("Last insert id: \(result)")
         }
         
         return result > 0 ? result : nil
