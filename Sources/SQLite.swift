@@ -75,7 +75,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            profiler?.debug("Opened: %@", path)
+            profiler?.debug("Database opened: %@", path)
             
             try execute("PRAGMA foreign_keys = ON")
         }
@@ -84,7 +84,7 @@ public final class SQLite {
     @discardableResult
     public func execute(_ query: Query) throws -> Int? {
         return try queue.sync {
-            let tracing = profiler?.begin("Query: %@", query.query)
+            let tracing = profiler?.begin(name: "Execute", "Query: %@", query.query)
             
             defer {
                 tracing?.end()
@@ -122,7 +122,7 @@ public final class SQLite {
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
         return try queue.sync {
-            let tracing = profiler?.begin("Query: %@", query.query)
+            let tracing = profiler?.begin(name: "Fetch", "Query: %@", query.query)
             
             defer {
                 tracing?.end()
@@ -163,7 +163,7 @@ public final class SQLite {
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
         return try queue.sync {
-            let tracing = profiler?.begin("Query: %@", query.query)
+            let tracing = profiler?.begin(name: "Fetch Once", "Query: %@", query.query)
             
             defer {
                 tracing?.end()
@@ -272,11 +272,11 @@ public final class SQLite {
         
         if result == 0 {
             result = Int(sqlite3_changes(databaseHandle))
-            profiler?.debug("%@ changes", result)
+            profiler?.debug("Changes: %@", result)
         }
         else {
             sqlite3_set_last_insert_rowid(databaseHandle, 0)
-            profiler?.debug("%@ created", result)
+            profiler?.debug("Last insert id: %@", result)
         }
         
         return result > 0 ? result : nil
