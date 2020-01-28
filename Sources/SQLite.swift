@@ -75,10 +75,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            if sqlite3_key(databaseHandle, key, Int32(key.count)) != SQLITE_OK {
-                throw SQLiteError.unknown(description: "Invalid database key")
-            }
-            
+            try cipherKey(key)
             try executeQuery("PRAGMA foreign_keys = ON")
         }
     }
@@ -208,6 +205,17 @@ public final class SQLite {
         catch {
             try executeQuery("ROLLBACK TRANSACTION")
             throw error
+        }
+    }
+    
+    private func cipherKey(_ key: String) throws {
+        sqlite3_key(databaseHandle, key, Int32(key.count))
+        
+        do {
+            try executeQuery("SELECT TOP 1 1 FROM sqlite_master")
+        }
+        catch {
+            throw SQLiteError.unknown(description: "Invalid database key")
         }
     }
     
