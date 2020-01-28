@@ -75,9 +75,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            var key = key
-            
-            if sqlite3_key(databaseHandle, &key, Int32(key.utf8.count)) != SQLITE_OK {
+            if sqlite3_key(databaseHandle, key, Int32(key.count)) != SQLITE_OK {
                 throw SQLiteError.unknown(description: "Invalid database key")
             }
             
