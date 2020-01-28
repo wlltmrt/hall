@@ -31,6 +31,10 @@ public enum SQLiteError: Error {
     case unknown(description: String)
 }
 
+public protocol SQLiteMigrationProtocol: class {
+    static func migrateQuery() -> String
+}
+
 public final class SQLite {
     public enum TransactionMode: String {
         case deferred = "DEFERRED"
@@ -54,7 +58,7 @@ public final class SQLite {
         sqlite3_close(databaseHandle)
     }
     
-    public func open(fileName: String = "default.db", key: String, enableProfiler: Bool = true) throws {
+    public func open<T: SQLiteMigrationProtocol>(fileName: String = "default.db", key: String, enableProfiler: Bool = true, migrations: T.Type...) throws {
         try queue.sync {
             if enableProfiler {
                 profiler = Profiler(category: "SQLite")
@@ -76,6 +80,7 @@ public final class SQLite {
             }
             
             try cipherKey(key)
+            try migrateIfNeeded(migrations: migrations)
             try executeQuery("PRAGMA foreign_keys = ON")
         }
     }
@@ -217,6 +222,32 @@ public final class SQLite {
         catch {
             throw SQLiteError.unknown(description: "Invalid database key")
         }
+    }
+    
+    private func migrateIfNeeded<T: SQLiteMigrationProtocol>(migrations: [T.Type]) throws {
+        let version: Int? = try fetchOnce("PRAGMA user_version") {
+            return $0[0]
+        }
+        
+        if let version = version {
+            profiler?.debug("Database version \(version)")
+            
+            guard version < migrations.count else {
+                return
+            }
+            
+            for i in (version + 1)...migrations.count {
+                try executeQuery(migrations[i].migrateQuery())
+            }
+            
+            vacuum()
+        }
+        
+        try executeQuery("PRAGMA user_version=\(migrations.count)")
+    }
+    
+    private func vacuum() {
+        try? executeQuery("VACUUM;ANALYZE")
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
