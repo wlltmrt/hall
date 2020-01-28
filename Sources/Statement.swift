@@ -23,7 +23,7 @@
 //
 
 import Foundation
-import SQLite3
+import SQLCipher
 
 public struct Statement {
     @usableFromInline

@@ -23,8 +23,8 @@
 //
 
 import Foundation
-import SQLite3
 import Adrenaline
+import SQLCipher
 
 public enum SQLiteError: Error {
     case invalidQuery(query: String, description: String)

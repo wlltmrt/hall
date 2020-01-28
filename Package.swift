@@ -38,13 +38,15 @@ let package = Package(
             targets: ["Hall"])
     ],
     dependencies: [
-        .package(url: "https://github.com/wellmart/adrenaline.git", .branch("master"))
+        .package(url: "https://github.com/wellmart/adrenaline.git", .branch("master")),
+        .package(url: "https://github.com/wellmart/sqlcipher.git", .branch("master"))
     ],
     targets: [
         .target(
             name: "Hall",
             dependencies: [
-                "Adrenaline"
+                "Adrenaline",
+                "SQLCipher"
             ],
             path: "Sources")
     ],
