@@ -63,27 +63,37 @@ extension Query: ExpressibleByStringInterpolation {
         
         @inlinable
         public mutating func appendInterpolation(join elements: [Character], separator: String = "") {
-            appendJoin(elements: elements) { String($0) }
+            appendJoin(elements: elements) {
+                return String($0)
+            }
         }
         
         @inlinable
         public mutating func appendInterpolation(join elements: [Date], separator: String = "") {
-            appendJoin(elements: elements) { String(Int64($0.timeIntervalSinceReferenceDate)) }
+            appendJoin(elements: elements) {
+                return String(Int64($0.timeIntervalSinceReferenceDate))
+            }
         }
         
         @inlinable
         public mutating func appendInterpolation(join elements: [Double], separator: String = "") {
-            appendJoin(elements: elements) { String($0) }
+            appendJoin(elements: elements) {
+                return String($0)
+            }
         }
         
         @inlinable
         public mutating func appendInterpolation(join elements: [Int], separator: String = "") {
-            appendJoin(elements: elements) { String($0) }
+            appendJoin(elements: elements) {
+                return String($0)
+            }
         }
         
         @inlinable
         public mutating func appendInterpolation(join elements: [String], separator: String = "") {
-            appendJoin(elements: elements) { $0 }
+            appendJoin(elements: elements) {
+                return $0
+            }
         }
         
         @usableFromInline

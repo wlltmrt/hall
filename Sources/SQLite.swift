@@ -54,7 +54,7 @@ public final class SQLite {
         sqlite3_close(databaseHandle)
     }
     
-    public func open(fileName: String = "default.db", enableProfiler: Bool = true) throws {
+    public func open(fileName: String = "default.db", key: String, enableProfiler: Bool = true) throws {
         try queue.sync {
             if enableProfiler {
                 profiler = Profiler(category: "SQLite")
@@ -73,6 +73,12 @@ public final class SQLite {
             
             if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
+            }
+            
+            var key = key
+            
+            if sqlite3_key(databaseHandle, &key, Int32(key.utf8.count)) != SQLITE_OK {
+                throw SQLiteError.unknown(description: "Invalid database key")
             }
             
             try executeQuery("PRAGMA foreign_keys = ON")
