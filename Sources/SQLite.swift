@@ -59,6 +59,11 @@ public final class SQLite {
     }
     
     public func open<T: SQLiteMigrationProtocol>(fileName: String = "default.db", key: String, enableProfiler: Bool = true, migrations: T.Type...) throws {
+        try open(fileName: fileName, key: key, enableProfiler: enableProfiler)
+        try migrateIfNeeded(migrations: migrations)
+    }
+    
+    public func open(fileName: String = "default.db", key: String, enableProfiler: Bool = true) throws {
         try queue.sync {
             if enableProfiler {
                 profiler = Profiler(category: "SQLite")
@@ -80,8 +85,6 @@ public final class SQLite {
             }
             
             try cipherKey(key)
-            try migrateIfNeeded(migrations: migrations)
-            try executeQuery("PRAGMA foreign_keys = ON")
         }
     }
     
