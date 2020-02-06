@@ -58,7 +58,7 @@ public final class SQLite {
         sqlite3_close(databaseHandle)
     }
     
-    public func open<T: SQLiteMigrationProtocol>(fileName: String = "default.db", key: String, enableProfiler: Bool = true, migrations: T.Type...) throws {
+    public func open<T: SQLiteMigrationProtocol>(fileName: String = "Default.db", key: String, enableProfiler: Bool = true, migrations: T.Type...) throws {
         try open(fileName: fileName, key: key, enableProfiler: enableProfiler)
         try migrateIfNeeded(migrations: migrations)
     }
