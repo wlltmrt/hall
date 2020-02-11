@@ -63,7 +63,7 @@ public final class SQLite {
         try migrateIfNeeded(migrations: migrations)
     }
     
-    public func open(fileName: String = "default.db", key: String, enableProfiler: Bool = true) throws {
+    public func open(fileName: String = "Default.db", key: String, enableProfiler: Bool = true) throws {
         try queue.sync {
             if enableProfiler {
                 profiler = Profiler(category: "SQLite")
