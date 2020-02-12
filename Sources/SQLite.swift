@@ -47,7 +47,7 @@ public final class SQLite {
     public static let `default` = SQLite()
     
     private var databaseHandle: OpaquePointer?
-    private var profiler: Profiler?
+    private var profiler: ProfilerProtocol?
     private let queue: DispatchQueue
     
     private init() {
@@ -58,16 +58,14 @@ public final class SQLite {
         sqlite3_close(databaseHandle)
     }
     
-    public func open<T: SQLiteMigrationProtocol>(fileName: String = "Default.db", key: String, enableProfiler: Bool = true, migrations: T.Type...) throws {
-        try open(fileName: fileName, key: key, enableProfiler: enableProfiler)
+    public func open<T: SQLiteMigrationProtocol>(fileName: String = "Default.sqlite", key: String, migrations: T.Type...) throws {
+        try open(fileName: fileName, key: key)
         try migrateIfNeeded(migrations: migrations)
     }
     
-    public func open(fileName: String = "Default.db", key: String, enableProfiler: Bool = true) throws {
+    public func open(fileName: String = "Default.sqlite", key: String) throws {
         try queue.sync {
-            if enableProfiler {
-                profiler = Profiler(category: "SQLite")
-            }
+            profiler = createProfiler(category: "SQLite")
             
             let fileManager = FileManager.default
             let path = fileManager.inDocumentDirectory(with: fileName).path
@@ -270,9 +268,6 @@ public final class SQLite {
         case let bool as Bool:
             result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
             
-        case let character as Character:
-            result = sqlite3_bind_int(statementHandle, index, CInt(UnicodeScalar(String(character))!.value))
-            
         case let data as Data:
             result = data.withUnsafeBytes {
                 sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), SQLite.SQLITE_TRANSIENT)
@@ -307,7 +302,7 @@ public final class SQLite {
         }
     }
     
-    private func executeResult(tracing: Profiler.Tracing?) -> Int? {
+    private func executeResult(tracing: ProfilerTracingProtocol?) -> Int? {
         var result = Int(sqlite3_last_insert_rowid(databaseHandle))
         
         if result == 0 {
