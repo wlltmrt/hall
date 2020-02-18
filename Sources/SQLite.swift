@@ -82,7 +82,12 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            try cipherKey(key)
+            do {
+                try cipherKey(key)
+            }
+            catch {
+                try cipherReKey(key)
+            }
         }
     }
     
@@ -216,6 +221,17 @@ public final class SQLite {
     
     private func cipherKey(_ key: String) throws {
         sqlite3_key(databaseHandle, key, Int32(key.count))
+        
+        do {
+            try executeQuery("SELECT TOP 1 1 FROM sqlite_master")
+        }
+        catch {
+            throw SQLiteError.unknown(description: "Invalid database key")
+        }
+    }
+    
+    private func cipherReKey(_ key: String) throws {
+        sqlite3_rekey(databaseHandle, key, Int32(key.count))
         
         do {
             try executeQuery("SELECT TOP 1 1 FROM sqlite_master")
