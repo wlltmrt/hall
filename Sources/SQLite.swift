@@ -82,12 +82,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            do {
-                try cipherKey(key)
-            }
-            catch {
-                try cipherReKey(key)
-            }
+            try cipherKey(key)
         }
     }
     
@@ -219,26 +214,8 @@ public final class SQLite {
         }
     }
     
-    private func cipherKey(_ key: String) throws {
-        sqlite3_key(databaseHandle, key, Int32(key.count))
-        
-        do {
-            try executeQuery("SELECT TOP 1 1 FROM sqlite_master")
-        }
-        catch {
-            throw SQLiteError.unknown(description: "Invalid database key")
-        }
-    }
-    
-    private func cipherReKey(_ key: String) throws {
-        sqlite3_rekey(databaseHandle, key, Int32(key.count))
-        
-        do {
-            try executeQuery("SELECT TOP 1 1 FROM sqlite_master")
-        }
-        catch {
-            throw SQLiteError.unknown(description: "Invalid database key")
-        }
+    public func changeKey(_ key: String) throws {
+        sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
     }
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(migrations: [T.Type]) throws {
@@ -261,6 +238,17 @@ public final class SQLite {
         }
         
         try executeQuery("PRAGMA user_version=\(migrations.count)")
+    }
+    
+    private func cipherKey(_ key: String) throws {
+        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
+        
+        do {
+            try executeQuery("SELECT 1 FROM sqlite_master LIMIT 1")
+        }
+        catch {
+            throw SQLiteError.unknown(description: "Invalid database key")
+        }
     }
     
     private func vacuum() {
