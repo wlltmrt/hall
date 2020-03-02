@@ -65,7 +65,7 @@ public final class SQLite {
     
     public func open(fileName: String = "Default.sqlite", key: String) throws {
         try queue.sync {
-            profiler = createProfiler(category: "SQLite")
+            profiler = createProfilerIfSupported(category: "SQLite")
             
             let fileManager = FileManager.default
             let path = fileManager.inDocumentDirectory(with: fileName).path
@@ -201,21 +201,21 @@ public final class SQLite {
         }
     }
     
-    public func transaction(_ mode: TransactionMode = .deferred, work: (_ sqlite: SQLite) throws -> Void) throws {
+    public func transaction(_ mode: TransactionMode = .deferred) throws -> Transaction {
         try executeQuery("BEGIN \(mode.rawValue) TRANSACTION")
-        
-        do {
-            try work(self)
-            try executeQuery("COMMIT TRANSACTION")
-        }
-        catch {
-            try executeQuery("ROLLBACK TRANSACTION")
-            throw error
-        }
+        return Transaction(sqlite: self)
     }
     
     public func changeKey(_ key: String) throws {
         sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
+    }
+    
+    func executeQuery(_ query: String) throws {
+        try queue.sync {
+            if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
+                throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            }
+        }
     }
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(migrations: [T.Type]) throws {
@@ -295,14 +295,6 @@ public final class SQLite {
         
         if result == SQLITE_ERROR {
             throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
-        }
-    }
-    
-    private func executeQuery(_ query: String) throws {
-        try queue.sync {
-            if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
-                throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
-            }
         }
     }
     
