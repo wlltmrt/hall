@@ -219,24 +219,19 @@ public final class SQLite {
     }
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(migrations: [T.Type]) throws {
-        let version: Int? = try fetchOnce("PRAGMA user_version") {
-            return $0[0]
+        let version: Int = try fetchOnce("PRAGMA user_version") { $0[0] } ?? 0
+        
+        profiler?.debug("Database version \(version)")
+        
+        guard version < migrations.count else {
+            return
         }
         
-        if let version = version {
-            profiler?.debug("Database version \(version)")
-            
-            guard version < migrations.count else {
-                return
-            }
-            
-            for i in (version + 1)...migrations.count {
-                try executeQuery(migrations[i].migrateQuery())
-            }
-            
-            vacuum()
+        for i in version..<migrations.count {
+            try executeQuery(migrations[i].migrateQuery())
         }
         
+        vacuum()
         try executeQuery("PRAGMA user_version=\(migrations.count)")
     }
     
