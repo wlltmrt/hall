@@ -24,11 +24,11 @@
 
 import Foundation
 
-protocol SQLiteRawRepresentable {
+public protocol SQLiteRawRepresentable {
     var sqliteValue: SQLiteValue { get }
 }
 
-extension SQLiteRawRepresentable where Self: RawRepresentable, Self.RawValue == Int {
+public extension SQLiteRawRepresentable where Self: RawRepresentable, Self.RawValue == Int {
     var sqliteValue: SQLiteValue {
         return rawValue
     }
