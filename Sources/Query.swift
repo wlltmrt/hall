@@ -28,6 +28,11 @@ import Adrenaline
 public struct Query {
     let query: String
     let values: [SQLiteValue?]?
+    
+    public init(query: String, values: [SQLiteValue?]?) {
+        self.query = query
+        self.values = values
+    }
 }
 
 extension Query: ExpressibleByStringLiteral {
