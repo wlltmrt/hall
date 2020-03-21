@@ -227,8 +227,13 @@ public final class SQLite {
             return
         }
         
-        for i in version..<migrations.count {
-            try executeQuery(migrations[i].migrateQuery())
+        if version != 0 {
+            for i in version..<migrations.count {
+                try executeQuery(migrations[i].migrateQuery())
+            }
+        }
+        else {
+            try executeQuery(migrations.first!.migrateQuery())
         }
         
         vacuum()
