@@ -90,6 +90,20 @@ public struct Statement {
     }
     
     @inlinable
+    public subscript<T: RawRepresentable>(index: CInt) -> T where T.RawValue == Int {
+        return T(rawValue: self[index])!
+    }
+    
+    @inlinable
+    public subscript<T: RawRepresentable>(index: CInt) -> T? where T.RawValue == Int {
+        guard let rawValue = self[index] as T.RawValue? else {
+            return nil
+        }
+        
+        return T(rawValue: rawValue)
+    }
+    
+    @inlinable
     func isNull(_ index: CInt) -> Bool {
         return sqlite3_column_type(handle, index) == SQLITE_NULL
     }

@@ -62,6 +62,11 @@ extension Query: ExpressibleByStringInterpolation {
         }
         
         @inlinable
+        public mutating func appendInterpolation<T: RawRepresentable>(_ value: T?) where T.RawValue == Int {
+            appendInterpolation(value?.rawValue)
+        }
+        
+        @inlinable
         public mutating func appendInterpolation(join elements: [Character], separator: String = "") {
             appendJoin(elements: elements) {
                 return String($0)
