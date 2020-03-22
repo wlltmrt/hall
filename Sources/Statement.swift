@@ -90,17 +90,23 @@ public struct Statement {
     }
     
     @inlinable
+    public subscript(index: CInt) -> TimeZone {
+        return TimeZone(secondsFromGMT: Int(sqlite3_column_int64(handle, index)))!
+    }
+    
+    @inlinable
+    public subscript(index: CInt) -> TimeZone? {
+        return isNull(index) ? nil : TimeZone(secondsFromGMT: Int(sqlite3_column_int64(handle, index)))
+    }
+    
+    @inlinable
     public subscript<T: RawRepresentable>(index: CInt) -> T where T.RawValue == Int {
-        return T(rawValue: self[index])!
+        return T(rawValue: Int(sqlite3_column_int64(handle, index)))!
     }
     
     @inlinable
     public subscript<T: RawRepresentable>(index: CInt) -> T? where T.RawValue == Int {
-        guard let rawValue = self[index] as T.RawValue? else {
-            return nil
-        }
-        
-        return T(rawValue: rawValue)
+        return T(rawValue: Int(sqlite3_column_int64(handle, index)))
     }
     
     @inlinable
