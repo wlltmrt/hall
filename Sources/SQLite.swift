@@ -31,8 +31,12 @@ public enum SQLiteError: Error {
     case unknown(description: String)
 }
 
+@objc
 public protocol SQLiteMigrationProtocol: class {
     static func migrateQuery() -> String
+    
+    @objc
+    optional static func completed()
 }
 
 public final class SQLite {
@@ -227,13 +231,21 @@ public final class SQLite {
             return
         }
         
+        var migration: T.Type!
+        
         if version != 0 {
             for i in version..<migrations.count {
-                try executeQuery(migrations[i].migrateQuery())
+                migration = migrations[i]
+                
+                try executeQuery(migration.migrateQuery())
+                migration.completed?()
             }
         }
         else {
-            try executeQuery(migrations.first!.migrateQuery())
+            migration = migrations.first!
+            
+            try executeQuery(migration.migrateQuery())
+            migration.completed?()
         }
         
         vacuum()
