@@ -26,6 +26,8 @@ import Foundation
 import Adrenaline
 
 public struct Query {
+    public static var delaySeconds: UInt32? = nil
+    
     let query: String
     let values: [SQLiteValue?]?
     

@@ -49,7 +49,6 @@ public final class SQLite {
     private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     
     public static let `default` = SQLite()
-    public var delaySeconds: UInt32? = nil
     
     private var databaseHandle: OpaquePointer?
     private var profiler: ProfilerProtocol?
@@ -94,7 +93,7 @@ public final class SQLite {
     @discardableResult
     public func execute(_ query: Query) throws -> Int? {
         return try queue.sync {
-            if let delaySeconds = delaySeconds {
+            if let delaySeconds = Query.delaySeconds {
                 sleep(delaySeconds)
             }
             
@@ -132,7 +131,7 @@ public final class SQLite {
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
         return try queue.sync {
-            if let delaySeconds = delaySeconds {
+            if let delaySeconds = Query.delaySeconds {
                 sleep(delaySeconds)
             }
             
@@ -177,7 +176,7 @@ public final class SQLite {
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
         return try queue.sync {
-            if let delaySeconds = delaySeconds {
+            if let delaySeconds = Query.delaySeconds {
                 sleep(delaySeconds)
             }
             
