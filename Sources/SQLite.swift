@@ -268,7 +268,7 @@ public final class SQLite {
         sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
         
         do {
-            try executeQuery("SELECT 1 FROM sqlite_master LIMIT 1")
+            try executeQuery("CREATE TABLE __hall__(cipher_check);DROP TABLE __hall__")
         }
         catch {
             throw SQLiteError.unknown(description: "Invalid database key")
