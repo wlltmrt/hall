@@ -75,49 +75,43 @@ extension Query: ExpressibleByStringInterpolation {
         
         @inlinable
         public mutating func appendInterpolation(join elements: [Character], separator: String = "") {
-            appendJoin(elements: elements) {
+            appendJoin(elements: elements, separator: separator) {
                 return String($0)
             }
         }
         
         @inlinable
         public mutating func appendInterpolation(join elements: [Date], separator: String = "") {
-            appendJoin(elements: elements) {
+            appendJoin(elements: elements, separator: separator) {
                 return String(Int64($0.timeIntervalSinceReferenceDate))
             }
         }
         
         @inlinable
         public mutating func appendInterpolation(join elements: [Double], separator: String = "") {
-            appendJoin(elements: elements) {
+            appendJoin(elements: elements, separator: separator) {
                 return String($0)
             }
         }
         
         @inlinable
         public mutating func appendInterpolation(join elements: [Int], separator: String = "") {
-            appendJoin(elements: elements) {
+            appendJoin(elements: elements, separator: separator) {
                 return String($0)
             }
         }
         
         @inlinable
         public mutating func appendInterpolation(join elements: [String], separator: String = "") {
-            appendJoin(elements: elements) {
+            appendJoin(elements: elements, separator: separator) {
                 return $0
             }
         }
         
         @usableFromInline
-        mutating func appendJoin<T>(elements: [T], separator: String = "", adaptee: (_ element: T) -> String) {
-            var value = String(reserveCapacity: elements.count + (separator.count * elements.count))
-            
-            for element in elements {
-                value.append(adaptee(element))
-            }
-            
+        mutating func appendJoin<T>(elements: [T], separator: String, adaptee: (_ element: T) -> String) {
             query.append("?")
-            values.append(value)
+            values.append(elements.map { adaptee($0) }.joined(separator: separator))
         }
     }
     
