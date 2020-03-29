@@ -47,7 +47,6 @@ public final class SQLite {
     }
     
     private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    
     public static let `default` = SQLite()
     
     private var databaseHandle: OpaquePointer?
