@@ -120,8 +120,7 @@ extension Query: ExpressibleByStringInterpolation {
                 value.append(adaptee(element))
             }
             
-            query.append("?")
-            values.append(value)
+            query.append(value)
         }
     }
     
