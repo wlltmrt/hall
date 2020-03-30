@@ -110,8 +110,18 @@ extension Query: ExpressibleByStringInterpolation {
         
         @usableFromInline
         mutating func appendJoin<T>(elements: [T], separator: String, adaptee: (_ element: T) -> String) {
+            var value = String(reserveCapacity: elements.count + (separator.count * elements.count))
+            
+            for element in elements {
+                if !value.isEmpty {
+                    value.append(separator)
+                }
+                
+                value.append(adaptee(element))
+            }
+            
             query.append("?")
-            values.append(elements.map { adaptee($0) }.joined(separator: separator))
+            values.append(value)
         }
     }
     

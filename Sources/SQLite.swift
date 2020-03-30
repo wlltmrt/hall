@@ -62,11 +62,6 @@ public final class SQLite {
     }
     
     public func open<T: SQLiteMigrationProtocol>(fileName: String = "Default.sqlite", key: String, migrations: T.Type...) throws {
-        try open(fileName: fileName, key: key)
-        try migrateIfNeeded(migrations: migrations)
-    }
-    
-    public func open(fileName: String = "Default.sqlite", key: String) throws {
         try queue.sync {
             profiler = createProfilerIfSupported(category: "SQLite")
             
@@ -86,6 +81,7 @@ public final class SQLite {
             }
             
             try cipherKey(key)
+            try migrateIfNeeded(migrations: migrations)
         }
     }
     
