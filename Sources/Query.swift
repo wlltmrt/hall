@@ -25,12 +25,17 @@
 import Foundation
 import Adrenaline
 
+@frozen
 public struct Query {
     public static var delaySeconds: UInt32? = nil
     
+    @usableFromInline
     let query: String
+    
+    @usableFromInline
     let values: [SQLiteValue?]?
     
+    @inlinable
     public init(query: String, values: [SQLiteValue?]?) {
         self.query = query
         self.values = values
@@ -108,7 +113,7 @@ extension Query: ExpressibleByStringInterpolation {
             }
         }
         
-        @usableFromInline
+        @inlinable
         mutating func appendJoin<T>(elements: [T], separator: String, adaptee: (_ element: T) -> String) {
             var value = String(reserveCapacity: elements.count + (separator.count * elements.count))
             
