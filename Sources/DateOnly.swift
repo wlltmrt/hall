@@ -29,16 +29,25 @@ public struct DateOnly {
     private static let dayInMilliseconds: TimeInterval = 86400000
     public let timeIntervalReference: TimeInterval
     
-    public init(timeIntervalReference: TimeInterval) {
+    public var dateValue: Date {
+        return Date(timeIntervalSinceReferenceDate: timeIntervalReference * DateOnly.dayInMilliseconds)
+    }
+    
+    @inlinable
+    public init?(_ date: Date?) {
+        guard let date = date else {
+            return nil
+        }
+        
+        self.init(date)
+    }
+    
+    public init(_ timeIntervalReference: TimeInterval) {
         self.timeIntervalReference = timeIntervalReference
     }
     
-    public init(date: Date) {
+    public init(_ date: Date) {
         self.timeIntervalReference = date.timeIntervalSinceReferenceDate / DateOnly.dayInMilliseconds
-    }
-    
-    public func toDate() -> Date {
-        return Date(timeIntervalSinceReferenceDate: timeIntervalReference * DateOnly.dayInMilliseconds)
     }
 }
 

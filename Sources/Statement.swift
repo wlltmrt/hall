@@ -101,12 +101,12 @@ public struct Statement {
     
     @inlinable
     public subscript(index: CInt) -> DateOnly {
-        return DateOnly(timeIntervalReference: TimeInterval(sqlite3_column_int64(handle, index)))
+        return DateOnly(TimeInterval(sqlite3_column_int64(handle, index)))
     }
     
     @inlinable
     public subscript(index: CInt) -> DateOnly? {
-        return isNull(index) ? nil : DateOnly(timeIntervalReference: TimeInterval(sqlite3_column_int64(handle, index)))
+        return isNull(index) ? nil : DateOnly(TimeInterval(sqlite3_column_int64(handle, index)))
     }
     
     @inlinable
