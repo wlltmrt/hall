@@ -26,11 +26,10 @@ import Foundation
 
 @frozen
 public struct DateOnly {
-    private static let dayInMilliseconds: TimeInterval = 86400000
     public let timeIntervalReference: TimeInterval
     
     public var dateValue: Date {
-        return Date(timeIntervalSinceReferenceDate: timeIntervalReference * DateOnly.dayInMilliseconds)
+        return Date(timeIntervalSinceReferenceDate: timeIntervalReference * 86400)
     }
     
     @inlinable
@@ -47,7 +46,7 @@ public struct DateOnly {
     }
     
     public init(_ date: Date) {
-        self.timeIntervalReference = date.timeIntervalSinceReferenceDate / DateOnly.dayInMilliseconds
+        self.timeIntervalReference = date.timeIntervalSinceReferenceDate / 86400
     }
 }
 
