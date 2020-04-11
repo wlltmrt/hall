@@ -79,42 +79,42 @@ extension Query: ExpressibleByStringInterpolation {
         }
         
         @inlinable
-        public mutating func appendInterpolation(join elements: [Character], withSeparator separator: String = "") {
+        public mutating func appendInterpolation(join elements: [Character], withSeparator separator: String = .empty) {
             appendJoin(elements: elements, separator: separator) {
                 return String($0)
             }
         }
         
         @inlinable
-        public mutating func appendInterpolation(join elements: [Date], withSeparator separator: String = "") {
+        public mutating func appendInterpolation(join elements: [Date], withSeparator separator: String = .empty) {
             appendJoin(elements: elements, separator: separator) {
                 return String(Int64($0.timeIntervalSinceReferenceDate))
             }
         }
         
         @inlinable
-        public mutating func appendInterpolation(join elements: [Double], withSeparator separator: String = "") {
+        public mutating func appendInterpolation(join elements: [Double], withSeparator separator: String = .empty) {
             appendJoin(elements: elements, separator: separator) {
                 return String($0)
             }
         }
         
         @inlinable
-        public mutating func appendInterpolation(join elements: [Int], withSeparator separator: String = "") {
+        public mutating func appendInterpolation(join elements: [Int], withSeparator separator: String = .empty) {
             appendJoin(elements: elements, separator: separator) {
                 return String($0)
             }
         }
         
         @inlinable
-        public mutating func appendInterpolation(join elements: [String], withSeparator separator: String = "") {
+        public mutating func appendInterpolation(join elements: [String], withSeparator separator: String = .empty) {
             appendJoin(elements: elements, separator: separator) {
                 return $0
             }
         }
         
         @inlinable
-        public mutating func appendInterpolation(join elements: [DateOnly], withSeparator separator: String = "") {
+        public mutating func appendInterpolation(join elements: [DateOnly], withSeparator separator: String = .empty) {
             appendJoin(elements: elements, separator: separator) {
                 return String(Int64($0.timeIntervalReference))
             }
