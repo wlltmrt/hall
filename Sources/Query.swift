@@ -114,6 +114,13 @@ extension Query: ExpressibleByStringInterpolation {
         }
         
         @inlinable
+        public mutating func appendInterpolation(join elements: [DateOnly], withSeparator separator: String = "") {
+            appendJoin(elements: elements, separator: separator) {
+                return String(Int64($0.timeIntervalReference))
+            }
+        }
+        
+        @inlinable
         mutating func appendJoin<T>(elements: [T], separator: String, adaptee: (_ element: T) -> String) {
             var value = String(reserveCapacity: elements.count + (separator.count * elements.count))
             
