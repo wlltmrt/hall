@@ -116,7 +116,7 @@ extension Query: ExpressibleByStringInterpolation {
         @inlinable
         public mutating func appendInterpolation(join elements: [DateOnly], withSeparator separator: String = .empty) {
             appendJoin(elements: elements, separator: separator) {
-                return String(Int64($0.timeIntervalReference))
+                return String(Int64($0.referenceValue))
             }
         }
         

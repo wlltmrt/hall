@@ -307,12 +307,9 @@ public final class SQLite {
             
         case let string as String:
             result = sqlite3_bind_text(statementHandle, index, string, -1, SQLite.SQLITE_TRANSIENT)
-            
-        case let timeZone as TimeZone:
-            result = sqlite3_bind_int(statementHandle, index, Int32(timeZone.secondsFromGMT()))
-            
+
         case let dateOnly as DateOnly:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.timeIntervalReference))
+            result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceValue))
             
         default:
             result = sqlite3_bind_null(statementHandle, index)

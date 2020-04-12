@@ -44,6 +44,3 @@ extension Int: SQLiteValue {
 
 extension String: SQLiteValue {
 }
-
-extension TimeZone: SQLiteValue {
-}

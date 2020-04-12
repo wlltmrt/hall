@@ -90,16 +90,6 @@ public struct Statement {
     }
     
     @inlinable
-    public subscript(index: CInt) -> TimeZone {
-        return TimeZone(secondsFromGMT: Int(sqlite3_column_int(handle, index)))!
-    }
-    
-    @inlinable
-    public subscript(index: CInt) -> TimeZone? {
-        return isNull(index) ? nil : TimeZone(secondsFromGMT: Int(sqlite3_column_int(handle, index)))
-    }
-    
-    @inlinable
     public subscript(index: CInt) -> DateOnly {
         return DateOnly(TimeInterval(sqlite3_column_int64(handle, index)))
     }
