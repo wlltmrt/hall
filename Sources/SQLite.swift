@@ -26,6 +26,7 @@ import Foundation
 import Adrenaline
 import SQLCipher
 
+@frozen
 public enum SQLiteError: Error {
     case invalidQuery(query: String, description: String)
     case unknown(description: String)
