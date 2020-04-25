@@ -264,7 +264,8 @@ public final class SQLite {
         sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
         
         do {
-            try executeQuery("CREATE TABLE __hall__(cipher_check);DROP TABLE __hall__")
+            try executeQuery("CREATE TABLE __hall__(cipher_check)")
+            try executeQuery("DROP TABLE __hall__")
         }
         catch {
             throw SQLiteError.unknown(description: "Invalid database key")
@@ -308,7 +309,7 @@ public final class SQLite {
             
         case let string as String:
             result = sqlite3_bind_text(statementHandle, index, string, -1, SQLite.SQLITE_TRANSIENT)
-
+            
         case let dateOnly as DateOnly:
             result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceValue))
             

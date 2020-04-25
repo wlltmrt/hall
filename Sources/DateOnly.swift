@@ -44,7 +44,8 @@ public struct DateOnly {
     public init(_ date: Date, calendar: Calendar = .current) {
         self.referenceValue = calendar.date(byAdding: .second, value: calendar.timeZone.secondsFromGMT(), to: date)!.timeIntervalSinceReferenceDate / 86400
     }
-    
+
+    @inlinable
     public func dateValue(calendar: Calendar = .current) -> Date {
         return calendar.date(byAdding: .second, value: -calendar.timeZone.secondsFromGMT(), to: Date(timeIntervalSinceReferenceDate: referenceValue * 86400))!
     }
