@@ -27,7 +27,7 @@ import Adrenaline
 
 @frozen
 public struct Query {
-    public static var delaySeconds: UInt32? = nil
+    public static var delaySeconds: TimeInterval? = nil
     
     @usableFromInline
     let query: String

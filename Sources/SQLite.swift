@@ -90,7 +90,7 @@ public final class SQLite {
     public func execute(_ query: Query) throws -> Int? {
         return try queue.sync {
             if let delaySeconds = Query.delaySeconds {
-                sleep(delaySeconds)
+                Thread.sleep(forTimeInterval: delaySeconds)
             }
             
             let tracing = profiler?.begin(name: "Execute", query.query)
@@ -128,7 +128,7 @@ public final class SQLite {
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
         return try queue.sync {
             if let delaySeconds = Query.delaySeconds {
-                sleep(delaySeconds)
+                Thread.sleep(forTimeInterval: delaySeconds)
             }
             
             let tracing = profiler?.begin(name: "Fetch", query.query)
@@ -173,7 +173,7 @@ public final class SQLite {
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
         return try queue.sync {
             if let delaySeconds = Query.delaySeconds {
-                sleep(delaySeconds)
+                Thread.sleep(forTimeInterval: delaySeconds)
             }
             
             let tracing = profiler?.begin(name: "Fetch Once", query.query)
