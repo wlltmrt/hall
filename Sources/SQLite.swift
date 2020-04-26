@@ -263,11 +263,11 @@ public final class SQLite {
     private func cipherKey(_ key: String) throws {
         sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
         
-        do {
-            try executeQuery("CREATE TABLE __hall__(cipher_check)")
-            try executeQuery("DROP TABLE __hall__")
-        }
-        catch {
+        try queue.sync {
+            guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(cc);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
+                return
+            }
+            
             throw SQLiteError.unknown(description: "Invalid database key")
         }
     }
