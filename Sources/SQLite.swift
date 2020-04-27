@@ -41,14 +41,15 @@ public protocol SQLiteMigrationProtocol: class {
 }
 
 public final class SQLite {
+    @frozen
     public enum TransactionMode: String {
         case deferred = "DEFERRED"
         case exclusive = "EXCLUSIVE"
         case immediate = "IMMEDIATE"
     }
     
-    private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     public static let `default` = SQLite()
+    private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     
     private var databaseHandle: OpaquePointer?
     private var profiler: ProfilerProtocol?
