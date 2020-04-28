@@ -65,14 +65,8 @@ public final class SQLite {
     
     public func open<T: SQLiteMigrationProtocol>(fileName: String = "Default.sqlite", key: String, migrations: T.Type...) throws {
         try queue.sync {
+            let path = FileManager.default.inDocumentDirectory(with: fileName).path
             profiler = createProfilerIfSupported(category: "SQLite")
-            
-            let fileManager = FileManager.default
-            let path = fileManager.inDocumentDirectory(with: fileName).path
-            
-            if !fileManager.fileExists(atPath: path), let resourcePath = Bundle.main.resourcePath {
-                try? fileManager.copyItem(atPath: URL(fileURLWithPath: resourcePath).appendingPathComponent(fileName).path, toPath: path)
-            }
             
             if let databaseHandle = databaseHandle {
                 sqlite3_close(databaseHandle)
