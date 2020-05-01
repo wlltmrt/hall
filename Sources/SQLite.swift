@@ -26,7 +26,6 @@ import Foundation
 import Adrenaline
 import SQLCipher
 
-@frozen
 public enum SQLiteError: Error {
     case invalidQuery(query: String, description: String)
     case unknown(description: String)
@@ -41,7 +40,6 @@ public protocol SQLiteMigrationProtocol: class {
 }
 
 public final class SQLite {
-    @frozen
     public enum TransactionMode: String {
         case deferred = "DEFERRED"
         case exclusive = "EXCLUSIVE"
@@ -56,7 +54,7 @@ public final class SQLite {
     private let queue: DispatchQueue
     
     private init() {
-        queue = DispatchQueue(label: "com.sqlite.queue", qos: .utility, attributes: .concurrent)
+        queue = DispatchQueue(label: "com.sqlite.queue", qos: .background, attributes: .concurrent)
     }
     
     deinit {
@@ -285,31 +283,31 @@ public final class SQLite {
         var result: CInt
         
         switch value {
-        case let bool as Bool:
-            result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
+            case let bool as Bool:
+                result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
             
-        case let data as Data:
-            result = data.withUnsafeBytes {
-                sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), SQLite.SQLITE_TRANSIENT)
+            case let data as Data:
+                result = data.withUnsafeBytes {
+                    sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), SQLite.SQLITE_TRANSIENT)
             }
             
-        case let date as Date:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))
+            case let date as Date:
+                result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))
             
-        case let double as Double:
-            result = sqlite3_bind_double(statementHandle, index, double)
+            case let double as Double:
+                result = sqlite3_bind_double(statementHandle, index, double)
             
-        case let integer as Int:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(integer))
+            case let integer as Int:
+                result = sqlite3_bind_int64(statementHandle, index, Int64(integer))
             
-        case let string as String:
-            result = sqlite3_bind_text(statementHandle, index, string, -1, SQLite.SQLITE_TRANSIENT)
+            case let string as String:
+                result = sqlite3_bind_text(statementHandle, index, string, -1, SQLite.SQLITE_TRANSIENT)
             
-        case let dateOnly as DateOnly:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceValue))
+            case let dateOnly as DateOnly:
+                result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceValue))
             
-        default:
-            result = sqlite3_bind_null(statementHandle, index)
+            default:
+                result = sqlite3_bind_null(statementHandle, index)
         }
         
         if result == SQLITE_ERROR {
@@ -326,7 +324,7 @@ public final class SQLite {
         }
         else {
             sqlite3_set_last_insert_rowid(databaseHandle, 0)
-            tracing?.end("Last insert id: \(result)")
+            tracing?.end("Insert id: \(result)")
         }
         
         return result > 0 ? result : nil

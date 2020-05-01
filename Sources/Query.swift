@@ -25,7 +25,6 @@
 import Foundation
 import Adrenaline
 
-@frozen
 public struct Query {
     public static var delaySeconds: TimeInterval? = nil
     
