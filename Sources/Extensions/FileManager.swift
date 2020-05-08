@@ -27,11 +27,11 @@ import Foundation
 extension FileManager {
     @inlinable
     var documentDirectory: URL {
-        return try! url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        return try! url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
     }
     
     @inlinable
-    func inDocumentDirectory(with path: String) -> URL {
+    func inApplicationSupportDirectory(with path: String) -> URL {
         return documentDirectory.appendingPathComponent(path)
     }
 }

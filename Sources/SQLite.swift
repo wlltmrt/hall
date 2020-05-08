@@ -40,6 +40,11 @@ public protocol SQLiteMigrationProtocol: class {
 }
 
 public final class SQLite {
+    public enum Location {
+        case memory
+        case path(fileName: String)
+    }
+    
     public enum TransactionMode: String {
         case deferred = "DEFERRED"
         case exclusive = "EXCLUSIVE"
@@ -47,6 +52,11 @@ public final class SQLite {
     }
     
     public static let `default` = SQLite()
+    
+    public var lastInsertRowid: Int {
+        return Int(sqlite3_last_insert_rowid(databaseHandle))
+    }
+    
     private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     
     private var databaseHandle: OpaquePointer?
@@ -58,16 +68,25 @@ public final class SQLite {
     }
     
     deinit {
-        sqlite3_close(databaseHandle)
+        sqlite3_close_v2(databaseHandle)
     }
     
-    public func open<T: SQLiteMigrationProtocol>(fileName: String = "Default.sqlite", key: String, migrations: T.Type...) throws {
+    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, migrations: T.Type...) throws {
         try queue.sync {
-            let path = FileManager.default.inDocumentDirectory(with: fileName).path
+            let path: String
+            
+            switch location {
+            case .memory:
+                path = ":memory:"
+                
+            case let .path(fileName):
+                path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
+            }
+            
             profiler = createProfilerIfSupported(category: "SQLite")
             
             if let databaseHandle = databaseHandle {
-                sqlite3_close(databaseHandle)
+                sqlite3_close_v2(databaseHandle)
             }
             
             if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
@@ -79,14 +98,17 @@ public final class SQLite {
         }
     }
     
-    @discardableResult
-    public func execute(_ query: Query) throws -> Int? {
+    public func execute(_ query: Query) throws {
         return try queue.sync {
             if let delaySeconds = Query.delaySeconds {
                 Thread.sleep(forTimeInterval: delaySeconds)
             }
             
             let tracing = profiler?.begin(name: "Execute", query.query)
+            
+            defer {
+                tracing?.end()
+            }
             
             var statementHandle: OpaquePointer? = nil
             var result: CInt = 0
@@ -113,8 +135,6 @@ public final class SQLite {
             if result == SQLITE_ERROR {
                 throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
             }
-            
-            return executeResult(tracing: tracing)
         }
     }
     
@@ -206,7 +226,7 @@ public final class SQLite {
         }
     }
     
-    public func transaction(_ mode: TransactionMode = .deferred) throws -> Transaction {
+    public func transaction(_ mode: TransactionMode = .exclusive) throws -> Transaction {
         try executeQuery("BEGIN \(mode.rawValue) TRANSACTION")
         return Transaction(sqlite: self)
     }
@@ -254,9 +274,9 @@ public final class SQLite {
     }
     
     private func cipherKey(_ key: String) throws {
-        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
-        
         try queue.sync {
+            sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
+            
             guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(cc);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
                 return
             }
@@ -283,50 +303,35 @@ public final class SQLite {
         var result: CInt
         
         switch value {
-            case let bool as Bool:
-                result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
+        case let bool as Bool:
+            result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
             
-            case let data as Data:
-                result = data.withUnsafeBytes {
-                    sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), SQLite.SQLITE_TRANSIENT)
+        case let data as Data:
+            result = data.withUnsafeBytes {
+                sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), SQLite.SQLITE_TRANSIENT)
             }
             
-            case let date as Date:
-                result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))
+        case let date as Date:
+            result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))
             
-            case let double as Double:
-                result = sqlite3_bind_double(statementHandle, index, double)
+        case let double as Double:
+            result = sqlite3_bind_double(statementHandle, index, double)
             
-            case let integer as Int:
-                result = sqlite3_bind_int64(statementHandle, index, Int64(integer))
+        case let integer as Int:
+            result = sqlite3_bind_int64(statementHandle, index, Int64(integer))
             
-            case let string as String:
-                result = sqlite3_bind_text(statementHandle, index, string, -1, SQLite.SQLITE_TRANSIENT)
+        case let string as String:
+            result = sqlite3_bind_text(statementHandle, index, string, -1, SQLite.SQLITE_TRANSIENT)
             
-            case let dateOnly as DateOnly:
-                result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceValue))
+        case let dateOnly as DateOnly:
+            result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceValue))
             
-            default:
-                result = sqlite3_bind_null(statementHandle, index)
+        default:
+            result = sqlite3_bind_null(statementHandle, index)
         }
         
         if result == SQLITE_ERROR {
             throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
         }
-    }
-    
-    private func executeResult(tracing: ProfilerTracingProtocol?) -> Int? {
-        var result = Int(sqlite3_last_insert_rowid(databaseHandle))
-        
-        if result == 0 {
-            result = Int(sqlite3_changes(databaseHandle))
-            tracing?.end("\(result) changes")
-        }
-        else {
-            sqlite3_set_last_insert_rowid(databaseHandle, 0)
-            tracing?.end("Insert id: \(result)")
-        }
-        
-        return result > 0 ? result : nil
     }
 }
