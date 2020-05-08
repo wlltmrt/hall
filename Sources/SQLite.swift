@@ -324,7 +324,7 @@ public final class SQLite {
             result = sqlite3_bind_text(statementHandle, index, string, -1, SQLite.SQLITE_TRANSIENT)
             
         case let dateOnly as DateOnly:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceValue))
+            result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceInterval))
             
         default:
             result = sqlite3_bind_null(statementHandle, index)

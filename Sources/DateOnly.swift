@@ -25,7 +25,7 @@
 import Foundation
 
 public struct DateOnly {
-    public let referenceValue: TimeInterval
+    public let referenceInterval: TimeInterval
     
     @inlinable
     public init?(_ date: Date?) {
@@ -36,17 +36,17 @@ public struct DateOnly {
         self.init(date)
     }
     
-    public init(_ referenceValue: TimeInterval) {
-        self.referenceValue = referenceValue
+    public init(_ referenceInterval: TimeInterval) {
+        self.referenceInterval = referenceInterval
     }
     
     public init(_ date: Date, calendar: Calendar = .current) {
-        self.referenceValue = calendar.date(byAdding: .second, value: calendar.timeZone.secondsFromGMT(), to: date)!.timeIntervalSinceReferenceDate / 86400
+        self.referenceInterval = calendar.date(byAdding: .second, value: calendar.timeZone.secondsFromGMT(), to: date)!.timeIntervalSinceReferenceDate / 86400
     }
     
     @inlinable
     public func dateValue(calendar: Calendar = .current) -> Date {
-        return calendar.date(byAdding: .second, value: -calendar.timeZone.secondsFromGMT(), to: Date(timeIntervalSinceReferenceDate: referenceValue * 86400))!
+        return calendar.date(byAdding: .second, value: -calendar.timeZone.secondsFromGMT(), to: Date(timeIntervalSinceReferenceDate: referenceInterval * 86400))!
     }
 }
 
