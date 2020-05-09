@@ -303,28 +303,28 @@ public final class SQLite {
         var result: CInt
         
         switch value {
-        case let bool as Bool:
-            result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
-            
-        case let data as Data:
-            result = data.withUnsafeBytes {
-                sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), SQLite.SQLITE_TRANSIENT)
-            }
-            
-        case let date as Date:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))
-            
-        case let double as Double:
-            result = sqlite3_bind_double(statementHandle, index, double)
-            
         case let integer as Int:
             result = sqlite3_bind_int64(statementHandle, index, Int64(integer))
             
         case let string as String:
             result = sqlite3_bind_text(statementHandle, index, string, -1, SQLite.SQLITE_TRANSIENT)
             
+        case let double as Double:
+            result = sqlite3_bind_double(statementHandle, index, double)
+            
+        case let bool as Bool:
+            result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
+            
+        case let date as Date:
+            result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))
+            
         case let dateOnly as DateOnly:
             result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceInterval))
+            
+        case let data as Data:
+            result = data.withUnsafeBytes {
+                sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), SQLite.SQLITE_TRANSIENT)
+            }
             
         default:
             result = sqlite3_bind_null(statementHandle, index)
