@@ -24,7 +24,12 @@
 
 import Foundation
 
-public struct DateOnly {
+public struct DateOnly: Equatable {
+    @inlinable
+    public static func ==(lhs: DateOnly, rhs: DateOnly) -> Bool {
+        return lhs.referenceInterval == rhs.referenceInterval
+    }
+    
     public let referenceInterval: TimeInterval
     
     @inlinable
