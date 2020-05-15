@@ -51,12 +51,12 @@ public struct Statement {
     
     @inlinable
     public subscript(index: CInt) -> Date {
-        return Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_int64(handle, index)))
+        return Date(timeIntervalSinceReferenceDate: sqlite3_column_double(handle, index))
     }
     
     @inlinable
     public subscript(index: CInt) -> Date? {
-        return isNull(index) ? nil : Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_int64(handle, index)))
+        return isNull(index) ? nil : Date(timeIntervalSinceReferenceDate: sqlite3_column_double(handle, index))
     }
     
     @inlinable

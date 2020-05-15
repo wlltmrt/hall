@@ -305,7 +305,7 @@ public final class SQLite {
             result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
             
         case let date as Date:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))
+            result = sqlite3_bind_double(statementHandle, index, date.timeIntervalSinceReferenceDate)
             
         case let data as Data:
             result = data.withUnsafeBytes {
