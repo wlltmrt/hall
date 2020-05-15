@@ -305,7 +305,6 @@ public final class SQLite {
             result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
             
         case let date as Date:
-            print("\(date), \(date.timeIntervalSinceReferenceDate)")
             result = sqlite3_bind_double(statementHandle, index, date.timeIntervalSinceReferenceDate)
             
         case let data as Data:
