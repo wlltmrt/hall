@@ -45,12 +45,6 @@ public final class SQLite {
         case path(fileName: String)
     }
     
-    public enum TransactionMode: String {
-        case deferred = "DEFERRED"
-        case exclusive = "EXCLUSIVE"
-        case immediate = "IMMEDIATE"
-    }
-    
     public static let `default` = SQLite()
     
     public var lastInsertRowid: Int {
@@ -226,11 +220,6 @@ public final class SQLite {
         }
     }
     
-    public func transaction(_ mode: TransactionMode = .exclusive) throws -> Transaction {
-        try executeQuery("BEGIN \(mode.rawValue) TRANSACTION")
-        return Transaction(sqlite: self)
-    }
-    
     public func changeKey(_ key: String) throws {
         sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
     }
@@ -317,9 +306,6 @@ public final class SQLite {
             
         case let date as Date:
             result = sqlite3_bind_int64(statementHandle, index, Int64(date.timeIntervalSinceReferenceDate))
-            
-        case let dateOnly as DateOnly:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(dateOnly.referenceInterval))
             
         case let data as Data:
             result = data.withUnsafeBytes {

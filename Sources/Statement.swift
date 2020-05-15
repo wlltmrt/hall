@@ -90,16 +90,6 @@ public struct Statement {
     }
     
     @inlinable
-    public subscript(index: CInt) -> DateOnly {
-        return DateOnly(TimeInterval(sqlite3_column_int64(handle, index)))
-    }
-    
-    @inlinable
-    public subscript(index: CInt) -> DateOnly? {
-        return isNull(index) ? nil : DateOnly(TimeInterval(sqlite3_column_int64(handle, index)))
-    }
-    
-    @inlinable
     public subscript<T: RawRepresentable>(index: CInt) -> T where T.RawValue == Int {
         return T(rawValue: Int(sqlite3_column_int64(handle, index)))!
     }

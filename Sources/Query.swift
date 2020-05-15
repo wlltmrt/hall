@@ -76,63 +76,6 @@ extension Query: ExpressibleByStringInterpolation {
         public mutating func appendInterpolation<T: RawRepresentable>(_ value: T?) where T.RawValue == Int {
             appendInterpolation(value?.rawValue)
         }
-        
-        @inlinable
-        public mutating func appendInterpolation(join elements: [Character], withSeparator separator: String = .empty) {
-            appendJoin(elements: elements, separator: separator) {
-                return String($0)
-            }
-        }
-        
-        @inlinable
-        public mutating func appendInterpolation(join elements: [Date], withSeparator separator: String = .empty) {
-            appendJoin(elements: elements, separator: separator) {
-                return String(Int64($0.timeIntervalSinceReferenceDate))
-            }
-        }
-        
-        @inlinable
-        public mutating func appendInterpolation(join elements: [Double], withSeparator separator: String = .empty) {
-            appendJoin(elements: elements, separator: separator) {
-                return String($0)
-            }
-        }
-        
-        @inlinable
-        public mutating func appendInterpolation(join elements: [Int], withSeparator separator: String = .empty) {
-            appendJoin(elements: elements, separator: separator) {
-                return String($0)
-            }
-        }
-        
-        @inlinable
-        public mutating func appendInterpolation(join elements: [String], withSeparator separator: String = .empty) {
-            appendJoin(elements: elements, separator: separator) {
-                return $0
-            }
-        }
-        
-        @inlinable
-        public mutating func appendInterpolation(join elements: [DateOnly], withSeparator separator: String = .empty) {
-            appendJoin(elements: elements, separator: separator) {
-                return String(Int64($0.referenceInterval))
-            }
-        }
-        
-        @inlinable
-        mutating func appendJoin<T>(elements: [T], separator: String, adaptee: (_ element: T) -> String) {
-            var value = String(reserveCapacity: elements.count + (separator.count * elements.count))
-            
-            for element in elements {
-                if !value.isEmpty {
-                    value.append(separator)
-                }
-                
-                value.append(adaptee(element))
-            }
-            
-            query.append(value)
-        }
     }
     
     public init(stringInterpolation interpolation: StringInterpolation) {
