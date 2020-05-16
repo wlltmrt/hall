@@ -88,6 +88,8 @@ public final class SQLite {
             }
             
             try cipherKey(key)
+            try executeQuery("PRAGMA cipher_memory_security=OFF")
+            
             try migrateIfNeeded(migrations: migrations)
         }
     }
