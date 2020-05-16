@@ -135,8 +135,8 @@ public final class SQLite {
     }
     
     @inlinable
-    public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> ContiguousArray<T> {
-        var elements = ContiguousArray<T>()
+    public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
+        var elements = [T]()
         try fetch(query, adaptee: adaptee) { elements.append($0) }
         
         return elements
