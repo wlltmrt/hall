@@ -132,7 +132,15 @@ public final class SQLite {
         }
     }
     
-    public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
+    @inlinable
+    public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> ContiguousArray<T> {
+        var elements = ContiguousArray<T>()
+        try fetch(query, adaptee: adaptee) { elements.append($0) }
+        
+        return elements
+    }
+    
+    public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
         return try queue.sync {
             if let delaySeconds = Query.delaySeconds {
                 Thread.sleep(forTimeInterval: delaySeconds)
@@ -146,7 +154,6 @@ public final class SQLite {
             
             var statementHandle: OpaquePointer? = nil
             var result: CInt = 0
-            var elements = [T]()
             
             if prepare(to: &statementHandle, query: query.query, result: &result) {
                 if let values = query.values {
@@ -160,7 +167,7 @@ public final class SQLite {
                 let statement = Statement(handle: statementHandle)
                 
                 while step(to: statementHandle, result: &result) {
-                    elements.append(adaptee(statement))
+                    block(adaptee(statement))
                 }
                 
                 sqlite3_finalize(statementHandle)
@@ -172,8 +179,6 @@ public final class SQLite {
             if result == SQLITE_ERROR {
                 throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
             }
-            
-            return elements
         }
     }
     
@@ -275,7 +280,7 @@ public final class SQLite {
     }
     
     private func vacuum() {
-        try? executeQuery("VACUUM;ANALYZE")
+        try? executeQuery("VACUUM")
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {

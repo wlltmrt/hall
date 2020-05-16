@@ -32,10 +32,10 @@ public struct Query {
     let query: String
     
     @usableFromInline
-    let values: [SQLiteValue?]?
+    let values: ContiguousArray<SQLiteValue?>?
     
     @inlinable
-    public init(query: String, values: [SQLiteValue?]?) {
+    public init(query: String, values: ContiguousArray<SQLiteValue?>?) {
         self.query = query
         self.values = values
     }
@@ -54,11 +54,11 @@ extension Query: ExpressibleByStringInterpolation {
         var query: String
         
         @usableFromInline
-        var values: [SQLiteValue?]
+        var values: ContiguousArray<SQLiteValue?>
         
         public init(literalCapacity: Int, interpolationCount: Int) {
             self.query = String(reserveCapacity: literalCapacity + interpolationCount)
-            self.values = [SQLiteValue?](reserveCapacity: interpolationCount)
+            self.values = ContiguousArray<SQLiteValue?>(reserveCapacity: interpolationCount)
         }
         
         @inlinable
