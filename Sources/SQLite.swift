@@ -309,7 +309,7 @@ public final class SQLite {
             result = sqlite3_bind_double(statementHandle, index, double)
             
         case let bool as Bool:
-            result = bool ? sqlite3_bind_int(statementHandle, index, 1) : sqlite3_bind_null(statementHandle, index)
+            result = sqlite3_bind_int(statementHandle, index, !bool ? 0 : 1)
             
         case let date as Date:
             result = sqlite3_bind_double(statementHandle, index, date.timeIntervalSinceReferenceDate)

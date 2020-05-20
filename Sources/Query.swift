@@ -28,14 +28,10 @@ import Adrenaline
 public struct Query {
     public static var delaySeconds: TimeInterval? = nil
     
-    @usableFromInline
     let query: String
-    
-    @usableFromInline
     let values: [SQLiteValue?]?
     
-    @inlinable
-    public init(query: String, values: [SQLiteValue?]?) {
+    public init(query: String, values: [SQLiteValue?]? = nil) {
         self.query = query
         self.values = values
     }
@@ -50,10 +46,7 @@ extension Query: ExpressibleByStringLiteral {
 
 extension Query: ExpressibleByStringInterpolation {
     public struct StringInterpolation: StringInterpolationProtocol {
-        @usableFromInline
         var query: String
-        
-        @usableFromInline
         var values: [SQLiteValue?]
         
         public init(literalCapacity: Int, interpolationCount: Int) {
@@ -61,18 +54,15 @@ extension Query: ExpressibleByStringInterpolation {
             self.values = [SQLiteValue?](reserveCapacity: interpolationCount)
         }
         
-        @inlinable
         public mutating func appendLiteral(_ literal: String) {
             query.append(literal)
         }
         
-        @inlinable
         public mutating func appendInterpolation<T: SQLiteValue>(_ value: T?) {
             query.append("?")
             values.append(value)
         }
         
-        @inlinable
         public mutating func appendInterpolation<T: RawRepresentable>(_ value: T?) where T.RawValue == Int {
             appendInterpolation(value?.rawValue)
         }

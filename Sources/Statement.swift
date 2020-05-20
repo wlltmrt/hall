@@ -36,7 +36,11 @@ public struct Statement {
     
     @inlinable
     public subscript(index: CInt) -> Bool {
-        return isNull(index) ? false : sqlite3_column_int(handle, index) != 0
+        return sqlite3_column_int(handle, index) != 0
+    }
+    
+    public subscript(index: CInt) -> Bool? {
+        return isNull(index) ? nil : sqlite3_column_int(handle, index) != 0
     }
     
     @inlinable
