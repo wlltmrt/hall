@@ -136,10 +136,10 @@ public final class SQLite {
     
     @inlinable
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
-        var elements = [T]()
-        try fetch(query, adaptee: adaptee) { elements.append($0) }
+        var items = [T]()
+        try fetch(query, adaptee: adaptee) { items.append($0) }
         
-        return elements
+        return items
     }
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
@@ -198,7 +198,7 @@ public final class SQLite {
             
             var statementHandle: OpaquePointer? = nil
             var result: CInt = 0
-            var element: T?
+            var item: T?
             
             if prepare(to: &statementHandle, query: query.query, result: &result) {
                 if let values = query.values {
@@ -210,7 +210,7 @@ public final class SQLite {
                 }
                 
                 if step(to: statementHandle, result: &result) {
-                    element = adaptee(Statement(handle: statementHandle))
+                    item = adaptee(Statement(handle: statementHandle))
                 }
                 
                 sqlite3_finalize(statementHandle)
@@ -223,7 +223,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
             }
             
-            return element
+            return item
         }
     }
     
