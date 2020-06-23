@@ -58,7 +58,7 @@ public final class SQLite {
     private let queue: DispatchQueue
     
     private init() {
-        queue = DispatchQueue(label: "com.sqlite.queue", qos: .background, attributes: .concurrent)
+        self.queue = DispatchQueue(label: "com.sqlite.queue", qos: .background, attributes: .concurrent)
     }
     
     deinit {
