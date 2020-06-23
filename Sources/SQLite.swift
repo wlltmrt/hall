@@ -227,6 +227,11 @@ public final class SQLite {
         }
     }
     
+    @inlinable
+    public func filePath(fileName: String = "Default.sqlite") -> URL {
+        return FileManager.default.inApplicationSupportDirectory(with: fileName)
+    }
+    
     public func changeKey(_ key: String) throws {
         sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
     }
