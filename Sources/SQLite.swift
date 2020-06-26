@@ -253,7 +253,7 @@ public final class SQLite {
             return
         }
         
-        var migration: T.Type!
+        var migration: T.Type
         
         if version != 0 {
             for i in version..<migrations.count {
