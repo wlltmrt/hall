@@ -59,6 +59,7 @@ public final class SQLite {
     
     private init() {
         self.queue = DispatchQueue(label: "com.sqlite.queue", qos: .background, attributes: .concurrent)
+        sqlite3_initialize()
     }
     
     deinit {
