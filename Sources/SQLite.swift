@@ -135,6 +135,14 @@ public final class SQLite {
         }
     }
     
+    public func executeQuery(_ query: String) throws {
+        try queue.sync {
+            if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
+                throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            }
+        }
+    }
+    
     @inlinable
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
         var items = [T]()
@@ -235,14 +243,6 @@ public final class SQLite {
     
     public func changeKey(_ key: String) throws {
         sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
-    }
-    
-    func executeQuery(_ query: String) throws {
-        try queue.sync {
-            if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
-                throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
-            }
-        }
     }
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(migrations: [T.Type]) throws {
