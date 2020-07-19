@@ -33,6 +33,8 @@ public enum SQLiteError: Error {
 
 @objc
 public protocol SQLiteMigrationProtocol: class {
+    static var version: Int { get }
+    
     static func migrateQuery() -> String
     
     @objc
@@ -247,32 +249,21 @@ public final class SQLite {
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(migrations: [T.Type]) throws {
         let version: Int = try fetchOnce("PRAGMA user_version") { $0[0] } ?? 0
+        let migrations = migrations.sorted { $0.version > $1.version }
         
-        profiler?.debug("Database version \(version)")
-        
-        guard version < migrations.count else {
-            return
-        }
-        
-        var migration: T.Type
-        
-        if version != 0 {
-            for i in version..<migrations.count {
-                migration = migrations[i]
-                
-                try executeQuery(migration.migrateQuery())
-                migration.completed?()
+        for migration in migrations {
+            guard version < migration.version else {
+                break
             }
-        }
-        else {
-            migration = migrations.first!
             
             try executeQuery(migration.migrateQuery())
+            try executeQuery("PRAGMA user_version=\(migration.version)")
+            
             migration.completed?()
+            vacuum()
         }
         
-        vacuum()
-        try executeQuery("PRAGMA user_version=\(migrations.count)")
+        profiler?.debug("Database version \(version)")
     }
     
     private func cipherKey(_ key: String) throws {
