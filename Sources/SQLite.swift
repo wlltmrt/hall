@@ -270,7 +270,7 @@ public final class SQLite {
         try queue.sync {
             sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
             
-            guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(cc);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
+            guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
                 return
             }
             
