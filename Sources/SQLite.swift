@@ -97,6 +97,10 @@ public final class SQLite {
         }
     }
     
+    public func close() {
+        sqlite3_close_v2(databaseHandle)
+    }
+    
     public func execute(_ query: Query) throws {
         return try queue.sync {
             if let delaySeconds = Query.delaySeconds {
