@@ -68,7 +68,7 @@ public final class SQLite {
         sqlite3_close_v2(databaseHandle)
     }
     
-    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, migrations: T.Type...) throws {
+    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, creation: T.Type, migrations: T.Type...) throws {
         try queue.sync {
             let path: String
             
@@ -93,7 +93,7 @@ public final class SQLite {
             try cipherKey(key)
             try executeQuery("PRAGMA cipher_memory_security=OFF")
             
-            try migrateIfNeeded(migrations: migrations)
+            try migrateIfNeeded(creation: creation, migrations: migrations)
         }
     }
     
@@ -251,22 +251,32 @@ public final class SQLite {
         sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
     }
     
-    private func migrateIfNeeded<T: SQLiteMigrationProtocol>(migrations: [T.Type]) throws {
-        let version: Int = try fetchOnce("PRAGMA user_version") { $0[0] } ?? 0
+    private func migrateIfNeeded<T: SQLiteMigrationProtocol>(creation: T.Type, migrations: [T.Type]) throws {
         let migrations = migrations.sorted { $0.version > $1.version }
+        
+        if let migration = migrations.last, creation.version != migration.version {
+            preconditionFailure("Invalid creation version")
+        }
+        
+        guard let version: Int = try fetchOnce("PRAGMA user_version", adaptee: { $0[0] }) else {
+            try executeQuery(creation.migrateQuery())
+            try executeQuery("PRAGMA user_version=\(creation.version)")
+            
+            return
+        }
         
         for migration in migrations {
             guard version < migration.version else {
-                break
+                continue
             }
             
             try executeQuery(migration.migrateQuery())
             try executeQuery("PRAGMA user_version=\(migration.version)")
             
             migration.completed?()
-            vacuum()
         }
         
+        try? executeQuery("VACUUM")
         profiler?.debug("Database version \(version)")
     }
     
@@ -280,10 +290,6 @@ public final class SQLite {
             
             throw SQLiteError.unknown(description: "Invalid database key")
         }
-    }
-    
-    private func vacuum() {
-        try? executeQuery("VACUUM")
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
