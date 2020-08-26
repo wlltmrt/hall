@@ -68,7 +68,7 @@ public final class SQLite {
         sqlite3_close_v2(databaseHandle)
     }
     
-    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, creation: T.Type, migrations: T.Type...) throws {
+    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: T.Type, migrations: T.Type...) throws {
         try queue.sync {
             let path: String
             
@@ -80,7 +80,9 @@ public final class SQLite {
                 path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
             }
             
-            profiler = createProfilerIfSupported(category: "SQLite")
+            if enableProfiler {
+                profiler = createProfilerIfSupported(category: "SQLite")
+            }
             
             if let databaseHandle = databaseHandle {
                 sqlite3_close_v2(databaseHandle)
