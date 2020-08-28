@@ -260,7 +260,7 @@ public final class SQLite {
             preconditionFailure("Invalid creation version")
         }
         
-        guard let version: Int = try fetchOnce("PRAGMA user_version", adaptee: { $0[0] }) else {
+        guard let version: Int = try fetchOnce("PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
             try executeQuery(creation.migrateQuery())
             try executeQuery("PRAGMA user_version=\(creation.version)")
             
