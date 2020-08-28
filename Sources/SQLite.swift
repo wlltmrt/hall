@@ -264,6 +264,7 @@ public final class SQLite {
             try executeQuery(creation.migrateQuery())
             try executeQuery("PRAGMA user_version=\(creation.version)")
             
+            creation.completed?()
             return
         }
         
