@@ -145,9 +145,11 @@ public final class SQLite {
     
     public func executeQuery(_ query: String) throws {
         try queue.sync {
-            if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
-                throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            guard sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR else {
+                return
             }
+            
+            throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
         }
     }
     
