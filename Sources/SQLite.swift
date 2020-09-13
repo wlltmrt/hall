@@ -92,8 +92,8 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            try cipherKey(key)
             try executeQuery("PRAGMA cipher_memory_security=OFF")
+            try cipherKey(key)
             
             try migrateIfNeeded(creation: creation, migrations: migrations)
         }
@@ -286,15 +286,13 @@ public final class SQLite {
     }
     
     private func cipherKey(_ key: String) throws {
-        try queue.sync {
-            sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
-            
-            guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
-                return
-            }
-            
-            throw SQLiteError.unknown(description: "Invalid database key")
+        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
+        
+        guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
+            return
         }
+        
+        throw SQLiteError.unknown(description: "Invalid database key")
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
