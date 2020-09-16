@@ -23,4 +23,5 @@
 //
 
 public protocol SQLiteEntity {
+    var uid: Int? { get }
 }
