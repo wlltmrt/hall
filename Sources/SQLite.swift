@@ -276,10 +276,10 @@ public final class SQLite {
             }
             
             try executeQuery(migration.migrateQuery())
-            try executeQuery("PRAGMA user_version=\(migration.version)")
-            
             migration.completed?()
-            try? executeQuery("VACUUM")
+            
+            try executeQuery("VACUUM")
+            try executeQuery("PRAGMA user_version=\(migration.version)")
         }
         
         profiler?.debug("Database version \(version)")
