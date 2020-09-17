@@ -292,7 +292,7 @@ public final class SQLite {
             return
         }
         
-        throw SQLiteError.unknown(description: "Invalid database key")
+        throw SQLiteError.unknown(description: "Invalid key")
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
