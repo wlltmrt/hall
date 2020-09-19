@@ -69,7 +69,7 @@ public final class SQLite {
         sqlite3_close_v2(databaseHandle)
     }
     
-    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: T.Type, migrations: T.Type..., prepare: () -> Void) throws {
+    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: T.Type, migrations: T.Type..., prepare: (() -> Void)? = nil) throws {
         try syncWrite {
             let path: String
             
@@ -81,7 +81,7 @@ public final class SQLite {
                 path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
             }
             
-            prepare()
+            prepare?()
             
             if enableProfiler {
                 profiler = createProfilerIfSupported(category: "SQLite")
