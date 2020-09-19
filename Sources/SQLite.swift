@@ -57,10 +57,11 @@ public final class SQLite {
     
     private var databaseHandle: OpaquePointer?
     private var profiler: ProfilerProtocol?
-    private let queue: DispatchQueue
+    
+    private var lock = ReadWriteLock()
+    private let queue = DispatchQueue(label: "com.sqlite.queue", qos: .background, attributes: .concurrent)
     
     private init() {
-        self.queue = DispatchQueue(label: "com.sqlite.queue", qos: .background, attributes: .concurrent)
         sqlite3_initialize()
     }
     
@@ -68,8 +69,8 @@ public final class SQLite {
         sqlite3_close_v2(databaseHandle)
     }
     
-    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: T.Type, migrations: T.Type...) throws {
-        try queue.sync {
+    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: T.Type, migrations: T.Type..., prepare: () -> Void) throws {
+        try syncWrite {
             let path: String
             
             switch location {
@@ -79,6 +80,8 @@ public final class SQLite {
             case let .path(fileName):
                 path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
             }
+            
+            prepare()
             
             if enableProfiler {
                 profiler = createProfilerIfSupported(category: "SQLite")
@@ -104,11 +107,7 @@ public final class SQLite {
     }
     
     public func execute(_ query: Query) throws {
-        return try queue.sync {
-            if let delaySeconds = Query.delaySeconds {
-                Thread.sleep(forTimeInterval: delaySeconds)
-            }
-            
+        return try syncRead {
             let tracing = profiler?.begin(name: "Execute", query.query)
             
             defer {
@@ -144,7 +143,13 @@ public final class SQLite {
     }
     
     public func executeQuery(_ query: String) throws {
-        try queue.sync {
+        try syncRead {
+            let tracing = profiler?.begin(name: "Execute Query", query)
+            
+            defer {
+                tracing?.end()
+            }
+            
             guard sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR else {
                 return
             }
@@ -162,11 +167,7 @@ public final class SQLite {
     }
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
-        return try queue.sync {
-            if let delaySeconds = Query.delaySeconds {
-                Thread.sleep(forTimeInterval: delaySeconds)
-            }
-            
+        return try syncRead {
             let tracing = profiler?.begin(name: "Fetch", query.query)
             
             defer {
@@ -204,11 +205,7 @@ public final class SQLite {
     }
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
-        return try queue.sync {
-            if let delaySeconds = Query.delaySeconds {
-                Thread.sleep(forTimeInterval: delaySeconds)
-            }
-            
+        return try syncRead {
             let tracing = profiler?.begin(name: "Fetch Once", query.query)
             
             defer {
@@ -253,6 +250,24 @@ public final class SQLite {
     
     public func changeKey(_ key: String) throws {
         sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
+    }
+    
+    private func syncRead<T>(execute work: () throws -> T) rethrows -> T {
+        return try queue.sync {
+            return try lock.read {
+                if let delaySeconds = Query.delaySeconds {
+                    Thread.sleep(forTimeInterval: delaySeconds)
+                }
+                
+                return try work()
+            }
+        }
+    }
+    
+    private func syncWrite(execute work: () throws -> Void) rethrows {
+        try queue.sync {
+            try lock.write(execute: work)
+        }
     }
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(creation: T.Type, migrations: [T.Type]) throws {
