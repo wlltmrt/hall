@@ -142,19 +142,9 @@ public final class SQLite {
         }
     }
     
-    public func executeQuery(_ query: String) throws {
+    public func execute(_ query: String) throws {
         try syncRead {
-            let tracing = profiler?.begin(name: "Execute Query", query)
-            
-            defer {
-                tracing?.end()
-            }
-            
-            guard sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR else {
-                return
-            }
-            
-            throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            try executeQuery(query)
         }
     }
     
@@ -268,6 +258,20 @@ public final class SQLite {
         try queue.sync {
             try lock.write(execute: work)
         }
+    }
+    
+    private func executeQuery(_ query: String) throws {
+        let tracing = profiler?.begin(name: "Execute", query)
+        
+        defer {
+            tracing?.end()
+        }
+        
+        guard sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR else {
+            return
+        }
+        
+        throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
     }
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(creation: T.Type, migrations: [T.Type]) throws {
