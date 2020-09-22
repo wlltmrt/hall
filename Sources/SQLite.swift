@@ -43,8 +43,8 @@ public protocol SQLiteMigrationProtocol: class {
 
 public final class SQLite {
     public enum Location {
-        case memory
         case path(fileName: String)
+        case memory
     }
     
     public static let `default` = SQLite()
@@ -70,7 +70,7 @@ public final class SQLite {
     }
     
     public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: T.Type, migrations: T.Type..., prepare: (() -> Void)? = nil) throws {
-        try syncWrite {
+        try lock.write {
             let path: String
             
             switch location {
@@ -95,9 +95,9 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            try executeQuery("PRAGMA cipher_memory_security=OFF")
-            try cipherKey(key)
+            sqlite3_exec(databaseHandle, "PRAGMA cipher_memory_security=OFF", nil, nil, nil)
             
+            try cipherKey(key)
             try migrateIfNeeded(creation: creation, migrations: migrations)
         }
     }
@@ -142,9 +142,19 @@ public final class SQLite {
         }
     }
     
-    public func execute(_ query: String) throws {
+    public func executeQuery(_ query: String) throws {
         try syncRead {
-            try executeQuery(query)
+            let tracing = profiler?.begin(name: "Execute Query", query)
+            
+            defer {
+                tracing?.end()
+            }
+            
+            guard sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR else {
+                return
+            }
+            
+            throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
         }
     }
     
@@ -254,24 +264,14 @@ public final class SQLite {
         }
     }
     
-    private func syncWrite(execute work: () throws -> Void) rethrows {
-        try queue.sync {
-            try lock.write(execute: work)
-        }
-    }
-    
-    private func executeQuery(_ query: String) throws {
-        let tracing = profiler?.begin(name: "Execute", query)
+    private func cipherKey(_ key: String) throws {
+        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
         
-        defer {
-            tracing?.end()
-        }
-        
-        guard sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR else {
+        guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
             return
         }
         
-        throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+        throw SQLiteError.unknown(description: "Invalid key")
     }
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(creation: T.Type, migrations: [T.Type]) throws {
@@ -295,23 +295,12 @@ public final class SQLite {
             }
             
             try executeQuery(migration.migrateQuery())
-            migration.completed?()
-            
-            try executeQuery("VACUUM")
             try executeQuery("PRAGMA user_version=\(migration.version)")
+            
+            migration.completed?()
         }
         
         profiler?.debug("Database version \(version)")
-    }
-    
-    private func cipherKey(_ key: String) throws {
-        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
-        
-        guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
-            return
-        }
-        
-        throw SQLiteError.unknown(description: "Invalid key")
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
