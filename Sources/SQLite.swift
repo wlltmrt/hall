@@ -36,9 +36,6 @@ public protocol SQLiteMigrationProtocol: class {
     static var version: Int { get }
     
     static func migrateQuery() -> String
-    
-    @objc
-    optional static func completed()
 }
 
 public final class SQLite {
@@ -95,7 +92,7 @@ public final class SQLite {
                 throw SQLiteError.unknown(description: "Can't open database: \(path)")
             }
             
-            sqlite3_exec(databaseHandle, "PRAGMA cipher_memory_security=OFF", nil, nil, nil)
+            try exec(query: "PRAGMA cipher_memory_security=OFF")
             
             try cipherKey(key)
             try migrateIfNeeded(creation: creation, migrations: migrations)
@@ -150,7 +147,7 @@ public final class SQLite {
                 tracing?.end()
             }
             
-            try exec(query)
+            try exec(query: query)
         }
     }
     
@@ -208,44 +205,42 @@ public final class SQLite {
                 tracing?.end()
             }
             
-            var statementHandle: OpaquePointer? = nil
-            var result: CInt = 0
-            var item: T?
-            
-            if prepare(to: &statementHandle, query: query.query, result: &result) {
-                if let values = query.values {
-                    let bindCount = sqlite3_bind_parameter_count(statementHandle)
-                    
-                    for i in 1...bindCount {
-                        try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
-                    }
-                }
-                
-                if step(to: statementHandle, result: &result) {
-                    item = adaptee(Statement(handle: statementHandle))
-                }
-                
-                sqlite3_finalize(statementHandle)
-            }
-            else {
-                throw SQLiteError.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle)))
-            }
-            
-            if result == SQLITE_ERROR {
-                throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
-            }
-            
-            return item
+            return try scalar(query: query, adaptee: adaptee)
         }
     }
     
     @inlinable
-    public func filePath(fileName: String = "Default.sqlite") -> URL {
+    public func path(fileName: String = "Default.sqlite") -> URL {
         return FileManager.default.inApplicationSupportDirectory(with: fileName)
     }
     
     public func changeKey(_ key: String) throws {
         sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
+    }
+    
+    private func migrateIfNeeded<T: SQLiteMigrationProtocol>(creation: T.Type, migrations: [T.Type]) throws {
+        let migrations = migrations.sorted { $0.version > $1.version }
+        
+        if let migration = migrations.last, creation.version != migration.version {
+            preconditionFailure("Invalid creation version")
+        }
+        
+        guard let version: Int = try? scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
+            try exec(query: creation.migrateQuery())
+            try exec(query: "PRAGMA user_version=\(creation.version)")
+            return
+        }
+        
+        for migration in migrations {
+            guard version < migration.version else {
+                continue
+            }
+            
+            try exec(query: migration.migrateQuery())
+            try exec(query: "PRAGMA user_version=\(migration.version)")
+        }
+        
+        profiler?.debug("Database version \(version)")
     }
     
     private func syncRead<T>(execute work: () throws -> T) rethrows -> T {
@@ -260,12 +255,6 @@ public final class SQLite {
         }
     }
     
-    private func exec(_ query: String) throws {
-        if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
-            throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
-        }
-    }
-    
     private func cipherKey(_ key: String) throws {
         sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
         
@@ -274,33 +263,10 @@ public final class SQLite {
         }
     }
     
-    private func migrateIfNeeded<T: SQLiteMigrationProtocol>(creation: T.Type, migrations: [T.Type]) throws {
-        let migrations = migrations.sorted { $0.version > $1.version }
-        
-        if let migration = migrations.last, creation.version != migration.version {
-            preconditionFailure("Invalid creation version")
+    private func exec(query: String) throws {
+        if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
+            throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
         }
-        
-        guard let version: Int = try fetchOnce("PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
-            try exec(creation.migrateQuery())
-            try exec("PRAGMA user_version=\(creation.version)")
-            
-            creation.completed?()
-            return
-        }
-        
-        for migration in migrations {
-            guard version < migration.version else {
-                continue
-            }
-            
-            try exec(migration.migrateQuery())
-            try exec("PRAGMA user_version=\(migration.version)")
-            
-            migration.completed?()
-        }
-        
-        profiler?.debug("Database version \(version)")
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
@@ -311,6 +277,37 @@ public final class SQLite {
     @discardableResult
     private func step(to statementHandle: OpaquePointer?, result: inout CInt) -> Bool {
         return sqlite3_step(statementHandle) == SQLITE_ROW
+    }
+    
+    private func scalar<T>(query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
+        var statementHandle: OpaquePointer? = nil
+        var result: CInt = 0
+        var item: T?
+        
+        if prepare(to: &statementHandle, query: query.query, result: &result) {
+            if let values = query.values {
+                let bindCount = sqlite3_bind_parameter_count(statementHandle)
+                
+                for i in 1...bindCount {
+                    try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
+                }
+            }
+            
+            if step(to: statementHandle, result: &result) {
+                item = adaptee(Statement(handle: statementHandle))
+            }
+            
+            sqlite3_finalize(statementHandle)
+        }
+        else {
+            throw SQLiteError.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle)))
+        }
+        
+        if result == SQLITE_ERROR {
+            throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+        }
+        
+        return item
     }
     
     private func bind(to statementHandle: OpaquePointer?, value: SQLiteValue?, at index: CInt) throws {
