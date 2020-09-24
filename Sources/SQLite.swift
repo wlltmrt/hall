@@ -150,11 +150,7 @@ public final class SQLite {
                 tracing?.end()
             }
             
-            guard sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR else {
-                return
-            }
-            
-            throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            try exec(query)
         }
     }
     
@@ -264,14 +260,18 @@ public final class SQLite {
         }
     }
     
+    private func exec(_ query: String) throws {
+        if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
+            throw SQLiteError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+        }
+    }
+    
     private func cipherKey(_ key: String) throws {
         sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
         
-        guard sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB else {
-            return
+        if sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB {
+            throw SQLiteError.unknown(description: "Invalid key")
         }
-        
-        throw SQLiteError.unknown(description: "Invalid key")
     }
     
     private func migrateIfNeeded<T: SQLiteMigrationProtocol>(creation: T.Type, migrations: [T.Type]) throws {
@@ -282,8 +282,8 @@ public final class SQLite {
         }
         
         guard let version: Int = try fetchOnce("PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
-            try executeQuery(creation.migrateQuery())
-            try executeQuery("PRAGMA user_version=\(creation.version)")
+            try exec(creation.migrateQuery())
+            try exec("PRAGMA user_version=\(creation.version)")
             
             creation.completed?()
             return
@@ -294,8 +294,8 @@ public final class SQLite {
                 continue
             }
             
-            try executeQuery(migration.migrateQuery())
-            try executeQuery("PRAGMA user_version=\(migration.version)")
+            try exec(migration.migrateQuery())
+            try exec("PRAGMA user_version=\(migration.version)")
             
             migration.completed?()
         }
