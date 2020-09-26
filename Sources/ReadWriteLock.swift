@@ -1,5 +1,3 @@
-// swift-tools-version:5.3
-
 //
 //  Hall
 //
@@ -24,37 +22,38 @@
 //  THE SOFTWARE.
 //
 
-import PackageDescription
+import Foundation
 
-let package = Package(
-    name: "Hall",
-    platforms: [
-        .macOS(.v10_12), .iOS(.v10), .tvOS(.v10), .watchOS(.v3)
-    ],
-    products: [
-        .library(
-            name: "Hall",
-            type: .static,
-            targets: ["Hall"])
-    ],
-    dependencies: [
-        .package(name: "Adrenaline", url: "https://github.com/wellmart/adrenaline.git", .branch("master")),
-        .package(name: "SQLCipher", url: "https://github.com/wellmart/sqlcipher.git", .branch("master"))
-    ],
-    targets: [
-        .target(
-            name: "Hall",
-            dependencies: [
-                "Adrenaline",
-                "SQLCipher"
-            ],
-            path: "Sources",
-            cSettings: [
-                .define("SQLITE_HAS_CODEC", to: "1")
-            ],
-            swiftSettings: [
-                .define("SQLITE_HAS_CODEC")
-            ])
-    ],
-    swiftLanguageVersions: [.v5]
-)
+final class ReadWriteLock {
+    @usableFromInline
+    var lock = pthread_rwlock_t()
+    
+    @inlinable
+    init() {
+        pthread_rwlock_init(&lock, nil)
+    }
+    
+    @inlinable
+    func read<T>(execute work: () throws -> T) rethrows -> T {
+        defer {
+            pthread_rwlock_unlock(&lock)
+        }
+        
+        pthread_rwlock_rdlock(&lock)
+        return try work()
+    }
+    
+    @inlinable
+    func write(execute work: () throws -> Void) rethrows {
+        defer {
+            pthread_rwlock_unlock(&lock)
+        }
+        
+        pthread_rwlock_wrlock(&lock)
+        try work()
+    }
+    
+    deinit {
+        pthread_rwlock_destroy(&lock)
+    }
+}

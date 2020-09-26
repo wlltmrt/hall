@@ -40,8 +40,8 @@ public protocol SQLiteMigrationProtocol: class {
 
 public final class SQLite {
     public enum Location {
-        case path(fileName: String)
         case memory
+        case path(fileName: String)
     }
     
     public static let `default` = SQLite()
@@ -56,7 +56,7 @@ public final class SQLite {
     private var profiler: ProfilerProtocol?
     
     private var lock = ReadWriteLock()
-    private let queue = DispatchQueue(label: "com.sqlite.queue", qos: .background, attributes: .concurrent)
+    private let queue = DispatchQueue(label: "com.sqlite.queue", qos: .utility, attributes: .concurrent)
     
     private init() {
         sqlite3_initialize()
@@ -71,11 +71,11 @@ public final class SQLite {
             let path: String
             
             switch location {
-            case .memory:
-                path = ":memory:"
-                
             case let .path(fileName):
                 path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
+                
+            case .memory:
+                path = ":memory:"
             }
             
             prepare?()
@@ -228,6 +228,7 @@ public final class SQLite {
         guard let version: Int = try? scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
             try exec(query: creation.migrateQuery())
             try exec(query: "PRAGMA user_version=\(creation.version)")
+            
             return
         }
         
