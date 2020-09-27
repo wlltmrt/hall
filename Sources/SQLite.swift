@@ -66,7 +66,7 @@ public final class SQLite {
         sqlite3_close_v2(databaseHandle)
     }
     
-    public func open<T: SQLiteMigrationProtocol>(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: T.Type, migrations: T.Type..., prepare: (() -> Void)? = nil) throws {
+    public func open(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: SQLiteMigrationProtocol.Type, migrations: SQLiteMigrationProtocol.Type..., prepare: (() -> Void)? = nil) throws {
         try lock.write {
             let path: String
             
@@ -218,7 +218,7 @@ public final class SQLite {
         sqlite3_rekey(databaseHandle, key, Int32(key.utf8.count))
     }
     
-    private func migrateIfNeeded<T: SQLiteMigrationProtocol>(creation: T.Type, migrations: [T.Type]) throws {
+    private func migrateIfNeeded(creation: SQLiteMigrationProtocol.Type, migrations: [SQLiteMigrationProtocol.Type]) throws {
         let migrations = migrations.sorted { $0.version > $1.version }
         
         if let migration = migrations.last, creation.version != migration.version {
