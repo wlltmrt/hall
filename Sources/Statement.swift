@@ -95,7 +95,7 @@ public struct Statement {
     
     @inlinable
     public subscript<T: RawRepresentable>(index: CInt) -> T where T.RawValue == Int {
-        return T(rawValue: Int(sqlite3_column_int64(handle, index))).unsafelyUnwrapped
+        return T(unsafelyRawValue: Int(sqlite3_column_int64(handle, index)))
     }
     
     @inlinable
