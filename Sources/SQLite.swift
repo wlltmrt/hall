@@ -41,7 +41,7 @@ public protocol SQLiteMigrationProtocol: class {
 public final class SQLite {
     public enum Location {
         case memory
-        case path(fileName: String)
+        case file(fileName: String)
     }
     
     public static let `default` = SQLite()
@@ -66,13 +66,13 @@ public final class SQLite {
         sqlite3_close_v2(databaseHandle)
     }
     
-    public func open(location: Location = .path(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: SQLiteMigrationProtocol.Type, migrations: SQLiteMigrationProtocol.Type..., prepare: (() -> Void)? = nil) throws {
+    public func open(location: Location = .file(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: SQLiteMigrationProtocol.Type, migrations: SQLiteMigrationProtocol.Type..., prepare: (() -> Void)? = nil) throws {
         try lock.write {
             let path: String
             
             switch location {
-            case let .path(fileName):
-                path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
+            case let .file(fileName):
+                path = fileUrl(fileName: fileName).path
                 
             case .memory:
                 path = ":memory:"
@@ -210,7 +210,7 @@ public final class SQLite {
     }
     
     @inlinable
-    public func path(fileName: String = "Default.sqlite") -> URL {
+    public func fileUrl(fileName: String = "Default.sqlite") -> URL {
         return FileManager.default.inApplicationSupportDirectory(with: fileName)
     }
     
