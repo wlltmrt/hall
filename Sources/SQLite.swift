@@ -55,7 +55,6 @@ public final class SQLite {
     private var databaseHandle: OpaquePointer?
     private var profiler: ProfilerProtocol?
     
-    private var lock = ReadWriteLock()
     private let queue = DispatchQueue(label: "com.sqlite.queue", qos: .utility, attributes: .concurrent)
     
     private init() {
@@ -66,37 +65,33 @@ public final class SQLite {
         sqlite3_close_v2(databaseHandle)
     }
     
-    public func open(location: Location = .file(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: SQLiteMigrationProtocol.Type, migrations: SQLiteMigrationProtocol.Type..., prepare: (() -> Void)? = nil) throws {
-        try lock.write {
-            let path: String
+    public func open(location: Location = .file(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false, creation: SQLiteMigrationProtocol.Type, migrations: SQLiteMigrationProtocol.Type...) throws {
+        let path: String
+        
+        switch location {
+        case let .file(fileName):
+            path = fileUrl(fileName: fileName).path
             
-            switch location {
-            case let .file(fileName):
-                path = fileUrl(fileName: fileName).path
-                
-            case .memory:
-                path = ":memory:"
-            }
-            
-            prepare?()
-            
-            if enableProfiler {
-                profiler = createProfilerIfSupported(category: "SQLite")
-            }
-            
-            if let databaseHandle = databaseHandle {
-                sqlite3_close_v2(databaseHandle)
-            }
-            
-            if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
-                throw SQLiteError.unknown(description: "Can't open database: \(path)")
-            }
-            
-            try exec(query: "PRAGMA cipher_memory_security=OFF")
-            
-            try cipherKey(key)
-            try migrateIfNeeded(creation: creation, migrations: migrations)
+        case .memory:
+            path = ":memory:"
         }
+        
+        if enableProfiler {
+            profiler = createProfilerIfSupported(category: "SQLite")
+        }
+        
+        if let databaseHandle = databaseHandle {
+            sqlite3_close_v2(databaseHandle)
+        }
+        
+        if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
+            throw SQLiteError.unknown(description: "Can't open database: \(path)")
+        }
+        
+        try exec(query: "PRAGMA cipher_memory_security=OFF")
+        
+        try cipherKey(key)
+        try migrateIfNeeded(creation: creation, migrations: migrations)
     }
     
     public func close() {
@@ -104,7 +99,11 @@ public final class SQLite {
     }
     
     public func execute(_ query: Query) throws {
-        return try syncRead {
+        return try queue.sync {
+            if let delaySeconds = Query.delaySeconds {
+                Thread.sleep(forTimeInterval: delaySeconds)
+            }
+            
             let tracing = profiler?.begin(name: "Execute", query.query)
             
             defer {
@@ -140,7 +139,11 @@ public final class SQLite {
     }
     
     public func executeQuery(_ query: String) throws {
-        try syncRead {
+        try queue.sync {
+            if let delaySeconds = Query.delaySeconds {
+                Thread.sleep(forTimeInterval: delaySeconds)
+            }
+            
             let tracing = profiler?.begin(name: "Execute Query", query)
             
             defer {
@@ -160,7 +163,11 @@ public final class SQLite {
     }
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
-        return try syncRead {
+        return try queue.sync {
+            if let delaySeconds = Query.delaySeconds {
+                Thread.sleep(forTimeInterval: delaySeconds)
+            }
+            
             let tracing = profiler?.begin(name: "Fetch", query.query)
             
             defer {
@@ -198,7 +205,11 @@ public final class SQLite {
     }
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
-        return try syncRead {
+        return try queue.sync {
+            if let delaySeconds = Query.delaySeconds {
+                Thread.sleep(forTimeInterval: delaySeconds)
+            }
+            
             let tracing = profiler?.begin(name: "Fetch Once", query.query)
             
             defer {
@@ -242,18 +253,6 @@ public final class SQLite {
         }
         
         profiler?.debug("Database version \(version)")
-    }
-    
-    private func syncRead<T>(execute work: () throws -> T) rethrows -> T {
-        return try queue.sync {
-            return try lock.read {
-                if let delaySeconds = Query.delaySeconds {
-                    Thread.sleep(forTimeInterval: delaySeconds)
-                }
-                
-                return try work()
-            }
-        }
     }
     
     private func cipherKey(_ key: String) throws {
