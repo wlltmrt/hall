@@ -95,7 +95,11 @@ public struct Statement {
     
     @inlinable
     public subscript<T: RawRepresentable>(index: CInt) -> T where T.RawValue == Int {
-        return T(unsafelyRawValue: Int(sqlite3_column_int64(handle, index)))
+        guard let value = T(rawValue: Int(sqlite3_column_int64(handle, index))) else {
+            preconditionFailure("Encountered an unknown value")
+        }
+        
+        return value
     }
     
     @inlinable
