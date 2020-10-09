@@ -230,7 +230,7 @@ public final class SQLite {
     }
     
     private func migrateIfNeeded(creation: SQLiteMigrationProtocol.Type, migrations: [SQLiteMigrationProtocol.Type]) throws {
-        let migrations = migrations.sorted { $0.version > $1.version }
+        let migrations = migrations.sorted { $0.version < $1.version }
         
         if let migration = migrations.last, creation.version != migration.version {
             preconditionFailure("Invalid creation version")
