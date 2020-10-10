@@ -22,6 +22,6 @@
 //  THE SOFTWARE.
 //
 
-public protocol SQLiteEntity {
+public protocol Entity {
     var uid: Int? { get }
 }

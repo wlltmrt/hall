@@ -24,23 +24,23 @@
 
 import Foundation
 
-public protocol SQLiteValue {
+public protocol Value {
 }
 
-extension Bool: SQLiteValue {
+extension Bool: Value {
 }
 
-extension Data: SQLiteValue {
+extension Data: Value {
 }
 
-extension Date: SQLiteValue {
+extension Date: Value {
 }
 
-extension Double: SQLiteValue {
+extension Double: Value {
 }
 
-extension Int: SQLiteValue {
+extension Int: Value {
 }
 
-extension String: SQLiteValue {
+extension String: Value {
 }

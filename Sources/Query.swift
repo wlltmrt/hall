@@ -29,9 +29,9 @@ public struct Query {
     public static var delaySeconds: TimeInterval? = nil
     
     let query: String
-    let values: [SQLiteValue?]?
+    let values: [Value?]?
     
-    public init(query: String, values: [SQLiteValue?]? = nil) {
+    public init(query: String, values: [Value?]? = nil) {
         self.query = query
         self.values = values
     }
@@ -47,18 +47,18 @@ extension Query: ExpressibleByStringLiteral {
 extension Query: ExpressibleByStringInterpolation {
     public struct StringInterpolation: StringInterpolationProtocol {
         var query: String
-        var values: [SQLiteValue?]
+        var values: [Value?]
         
         public init(literalCapacity: Int, interpolationCount: Int) {
             self.query = String(reserveCapacity: literalCapacity + interpolationCount)
-            self.values = [SQLiteValue?](reserveCapacity: interpolationCount)
+            self.values = [Value?](reserveCapacity: interpolationCount)
         }
         
         public mutating func appendLiteral(_ literal: String) {
             query.append(literal)
         }
         
-        public mutating func appendInterpolation<T: SQLiteValue>(_ value: T?) {
+        public mutating func appendInterpolation<T: Value>(_ value: T?) {
             query.append("?")
             values.append(value)
         }
