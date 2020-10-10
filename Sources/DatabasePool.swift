@@ -92,3 +92,35 @@ public final class DatabasePool {
         return try queue.sync { try action(database) }
     }
 }
+
+public extension DatabasePool {
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Bool) throws -> Bool {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Data) throws -> Data {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Date) throws -> Date {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Double) throws -> Double {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Int) throws -> Int {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> String) throws -> String {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+}
