@@ -31,25 +31,35 @@ public final class DatabasePool {
     
     public static let `default` = DatabasePool()
     
+    public var fileUrl: URL? {
+        guard case let .file(fileName) = location else {
+            return nil
+        }
+        
+        return FileManager.default.inApplicationSupportDirectory(with: fileName)
+    }
+    
     private var location: Location?
     private var keyBlock: KeyBlock?
     private var profiler: ProfilerProtocol?
     
-    private let queue = DispatchQueue(label: "com.sqlite.pool", qos: .utility)
+    private let queue = DispatchQueue(label: "com.sqlite.queue", qos: .utility)
     private lazy var idles = Set<Database>()
     
-    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false) throws {
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type...) throws {
         self.location = location
         self.keyBlock = keyBlock
         
         if enableProfiler {
-            self.profiler = createProfilerIfSupported(category: "SQLite")
+            self.profiler = createProfilerIfSupported(category: "Database")
         }
+        
+        try migrateIfNeeded(creation: creation, migrations: migrations)
     }
     
     public func drain() {
         queue.sync {
-            idles.removeAll()
+            idles.removeAll(keepingCapacity: false)
         }
     }
     
@@ -117,6 +127,36 @@ public final class DatabasePool {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
+    private func migrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
+        guard let location = location,
+              let keyBlock = keyBlock else {
+            preconditionFailure("Prepare the pool")
+        }
+        
+        let migrations = migrations.sorted { $0.version > $1.version }
+        
+        if let migration = migrations.first, creation.version != migration.version {
+            preconditionFailure("Invalid creation version")
+        }
+        
+        let database = try Database(location: location, key: keyBlock())
+        
+        guard let version: Int = try? database.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
+            try database.exec(query: "\(creation.migrateQuery());PRAGMA user_version=\(creation.version)")
+            return
+        }
+        
+        for migration in migrations {
+            guard version < migration.version else {
+                continue
+            }
+            
+            try database.exec(query: "\(migration.migrateQuery());PRAGMA user_version=\(migration.version)")
+        }
+        
+        profiler?.debug("Database v\(version)")
+    }
+    
     private func perform<T>(action: (_ database: Database) throws -> T) throws -> T {
         var database: Database!
         
@@ -129,7 +169,7 @@ public final class DatabasePool {
         if database == nil {
             guard let location = location,
                   let keyBlock = keyBlock else {
-                preconditionFailure("Pool is not prepared")
+                preconditionFailure("Prepare the pool")
             }
             
             database = try Database(location: location, key: keyBlock())

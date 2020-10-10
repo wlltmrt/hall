@@ -60,11 +60,12 @@ public final class Database {
         }
         
         try exec(query: "PRAGMA cipher_memory_security=OFF")
-        try cipherKey(key)
+        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
     }
     
     deinit {
         sqlite3_close_v2(databaseHandle)
+        databaseHandle = nil
     }
     
     func exec(query: String) throws {
@@ -160,14 +161,6 @@ public final class Database {
         }
         
         return item
-    }
-    
-    private func cipherKey(_ key: String) throws {
-        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
-        
-        if sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB {
-            throw DatabaseError.unknown(description: "Invalid key")
-        }
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
