@@ -55,7 +55,7 @@ public final class Database {
             sqlite3_close_v2(databaseHandle)
         }
         
-        if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_SHAREDCACHE, nil) != SQLITE_OK {
+        if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, nil) != SQLITE_OK {
             throw DatabaseError.unknown(description: "Can't open database: \(path)")
         }
         
