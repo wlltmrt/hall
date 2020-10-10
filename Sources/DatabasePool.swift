@@ -118,12 +118,15 @@ public final class DatabasePool {
     }
     
     private func perform<T>(action: (_ database: Database) throws -> T) throws -> T {
-        let database: Database
+        var database: Database!
         
-        if !idles.isEmpty {
-            database = queue.sync { idles.removeFirst() }
+        queue.sync {
+            if !idles.isEmpty {
+                database = idles.removeFirst()
+            }
         }
-        else {
+        
+        if database == nil {
             guard let location = location,
                   let keyBlock = keyBlock else {
                 preconditionFailure("Pool is not prepared")
