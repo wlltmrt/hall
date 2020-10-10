@@ -30,13 +30,13 @@ public final class DatabasePool {
     public typealias KeyBlock = () -> String
     
     public static let `default` = DatabasePool()
-    private lazy var idles = Set<Database>()
     
     private var location: Location?
     private var keyBlock: KeyBlock?
     private var profiler: ProfilerProtocol?
     
-    private let queue = DispatchQueue(label: "com.sqlite.pool", qos: .utility, attributes: .concurrent)
+    private let queue = DispatchQueue(label: "com.sqlite.pool", qos: .utility)
+    private lazy var idles = Set<Database>()
     
     public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false) throws {
         self.location = location
@@ -49,7 +49,7 @@ public final class DatabasePool {
     
     public func drain() {
         queue.sync {
-            idles.removeAll(keepingCapacity: false)
+            idles.removeAll()
         }
     }
     
@@ -118,27 +118,27 @@ public final class DatabasePool {
     }
     
     private func perform<T>(action: (_ database: Database) throws -> T) throws -> T {
-        return try queue.sync {
-            let database: Database
-            
-            if !idles.isEmpty {
-                database = idles.removeFirst()
-            }
-            else {
-                guard let location = location,
-                      let keyBlock = keyBlock else {
-                    preconditionFailure("Pool is not prepared")
-                }
-                
-                database = try Database(location: location, key: keyBlock())
+        let database: Database
+        
+        if !idles.isEmpty {
+            database = queue.sync { idles.removeFirst() }
+        }
+        else {
+            guard let location = location,
+                  let keyBlock = keyBlock else {
+                preconditionFailure("Pool is not prepared")
             }
             
-            defer {
+            database = try Database(location: location, key: keyBlock())
+        }
+        
+        defer {
+            _ = queue.sync {
                 idles.insert(database)
             }
-            
-            return try action(database)
         }
+        
+        return try action(database)
     }
 }
 
