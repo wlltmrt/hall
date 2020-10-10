@@ -38,11 +38,9 @@ public final class Database {
     }
     
     private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    
     private var databaseHandle: OpaquePointer?
-    private var profiler: ProfilerProtocol?
     
-    init(location: Location = .file(fileName: "Default.sqlite"), key: String, enableProfiler: Bool = false) throws {
+    init(location: Location, key: String) throws {
         let path: String
         
         switch location {
@@ -51,10 +49,6 @@ public final class Database {
             
         case .memory:
             path = ":memory:"
-        }
-        
-        if enableProfiler {
-            profiler = createProfilerIfSupported(category: "SQLite")
         }
         
         if let databaseHandle = databaseHandle {
@@ -73,17 +67,13 @@ public final class Database {
         sqlite3_close_v2(databaseHandle)
     }
     
+    func exec(query: String) throws {
+        if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
+            throw DatabaseError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+        }
+    }
+    
     func execute(_ query: Query) throws {
-        if let delaySeconds = Query.delaySeconds {
-            Thread.sleep(forTimeInterval: delaySeconds)
-        }
-        
-        let tracing = profiler?.begin(name: "Execute", query.query)
-        
-        defer {
-            tracing?.end()
-        }
-        
         var statementHandle: OpaquePointer? = nil
         var result: CInt = 0
         
@@ -111,31 +101,7 @@ public final class Database {
         }
     }
     
-    func executeQuery(_ query: String) throws {
-        if let delaySeconds = Query.delaySeconds {
-            Thread.sleep(forTimeInterval: delaySeconds)
-        }
-        
-        let tracing = profiler?.begin(name: "Execute Query", query)
-        
-        defer {
-            tracing?.end()
-        }
-        
-        try exec(query: query)
-    }
-    
     func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
-        if let delaySeconds = Query.delaySeconds {
-            Thread.sleep(forTimeInterval: delaySeconds)
-        }
-        
-        let tracing = profiler?.begin(name: "Fetch", query.query)
-        
-        defer {
-            tracing?.end()
-        }
-        
         var statementHandle: OpaquePointer? = nil
         var result: CInt = 0
         
@@ -165,45 +131,7 @@ public final class Database {
         }
     }
     
-    func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
-        if let delaySeconds = Query.delaySeconds {
-            Thread.sleep(forTimeInterval: delaySeconds)
-        }
-        
-        let tracing = profiler?.begin(name: "Fetch Once", query.query)
-        
-        defer {
-            tracing?.end()
-        }
-        
-        return try scalar(query: query, adaptee: adaptee)
-    }
-    
-    private func cipherKey(_ key: String) throws {
-        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
-        
-        if sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB {
-            throw DatabaseError.unknown(description: "Invalid key")
-        }
-    }
-    
-    private func exec(query: String) throws {
-        if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
-            throw DatabaseError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
-        }
-    }
-    
-    private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
-        result = sqlite3_prepare_v2(databaseHandle, query, -1, &statementHandle, nil)
-        return result == SQLITE_OK
-    }
-    
-    @discardableResult
-    private func step(to statementHandle: OpaquePointer?, result: inout CInt) -> Bool {
-        return sqlite3_step(statementHandle) == SQLITE_ROW
-    }
-    
-    private func scalar<T>(query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
+    func scalar<T>(query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
         var statementHandle: OpaquePointer? = nil
         var result: CInt = 0
         var item: T?
@@ -232,6 +160,24 @@ public final class Database {
         }
         
         return item
+    }
+    
+    private func cipherKey(_ key: String) throws {
+        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
+        
+        if sqlite3_exec(databaseHandle, "CREATE TABLE __hall__(t);DROP TABLE __hall__", nil, nil, nil) == SQLITE_NOTADB {
+            throw DatabaseError.unknown(description: "Invalid key")
+        }
+    }
+    
+    private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
+        result = sqlite3_prepare_v2(databaseHandle, query, -1, &statementHandle, nil)
+        return result == SQLITE_OK
+    }
+    
+    @discardableResult
+    private func step(to statementHandle: OpaquePointer?, result: inout CInt) -> Bool {
+        return sqlite3_step(statementHandle) == SQLITE_ROW
     }
     
     private func bind(to statementHandle: OpaquePointer?, value: Value?, at index: CInt) throws {

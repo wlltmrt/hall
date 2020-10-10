@@ -30,26 +30,55 @@ public final class DatabasePool {
     public typealias KeyBlock = () -> String
     
     public static let `default` = DatabasePool()
-    
-    private lazy var actives = Set<Database>()
-    private lazy var inactives = Set<Database>()
+    private lazy var idles = Set<Database>()
     
     private var location: Location?
     private var keyBlock: KeyBlock?
+    private var profiler: ProfilerProtocol?
     
     private let queue = DispatchQueue(label: "com.sqlite.pool", qos: .utility, attributes: .concurrent)
     
-    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock) throws {
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false) throws {
         self.location = location
         self.keyBlock = keyBlock
+        
+        if enableProfiler {
+            self.profiler = createProfilerIfSupported(category: "SQLite")
+        }
+    }
+    
+    public func drain() {
+        queue.sync {
+            idles.removeAll(keepingCapacity: false)
+        }
     }
     
     public func execute(_ query: Query) throws {
+        if let delaySeconds = Query.delaySeconds {
+            Thread.sleep(forTimeInterval: delaySeconds)
+        }
+        
+        let tracing = profiler?.begin(name: "Execute", query.query)
+        
+        defer {
+            tracing?.end()
+        }
+        
         try perform { try $0.execute(query) }
     }
     
     public func executeQuery(_ query: String) throws {
-        try perform { try $0.executeQuery(query) }
+        if let delaySeconds = Query.delaySeconds {
+            Thread.sleep(forTimeInterval: delaySeconds)
+        }
+        
+        let tracing = profiler?.begin(name: "Execute Query", query)
+        
+        defer {
+            tracing?.end()
+        }
+        
+        try perform { try $0.exec(query: query) }
     }
     
     @inlinable
@@ -61,35 +90,55 @@ public final class DatabasePool {
     }
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
+        if let delaySeconds = Query.delaySeconds {
+            Thread.sleep(forTimeInterval: delaySeconds)
+        }
+        
+        let tracing = profiler?.begin(name: "Fetch", query.query)
+        
+        defer {
+            tracing?.end()
+        }
+        
         try perform { try $0.fetch(query, adaptee: adaptee, using: block) }
     }
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
-        return try perform { try $0.fetchOnce(query, adaptee: adaptee) }
+        if let delaySeconds = Query.delaySeconds {
+            Thread.sleep(forTimeInterval: delaySeconds)
+        }
+        
+        let tracing = profiler?.begin(name: "Fetch Once", query.query)
+        
+        defer {
+            tracing?.end()
+        }
+        
+        return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
     private func perform<T>(action: (_ database: Database) throws -> T) throws -> T {
-        let database: Database
-        
-        if !inactives.isEmpty {
-            database = inactives.removeFirst()
-        } else {
-            guard let location = location,
-                  let keyBlock = keyBlock else {
-                preconditionFailure("")
+        return try queue.sync {
+            let database: Database
+            
+            if !idles.isEmpty {
+                database = idles.removeFirst()
+            }
+            else {
+                guard let location = location,
+                      let keyBlock = keyBlock else {
+                    preconditionFailure("Pool is not prepared")
+                }
+                
+                database = try Database(location: location, key: keyBlock())
             }
             
-            database = try Database(location: location, key: keyBlock())
+            defer {
+                idles.insert(database)
+            }
+            
+            return try action(database)
         }
-        
-        actives.insert(database)
-        
-        defer {
-            actives.remove(database)
-            inactives.insert(database)
-        }
-        
-        return try queue.sync { try action(database) }
     }
 }
 
