@@ -43,7 +43,7 @@ public final class DatabasePool {
     private var keyBlock: KeyBlock?
     private var profiler: ProfilerProtocol?
     
-    private let queue = DispatchQueue(label: "com.sqlite.queue", qos: .utility)
+    private let queue = DispatchQueue(label: "com.database.queue", qos: .utility)
     private lazy var idles = Set<Database>()
     
     public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type...) throws {
@@ -54,7 +54,7 @@ public final class DatabasePool {
             self.profiler = createProfilerIfSupported(category: "Database")
         }
         
-        try migrateIfNeeded(creation: creation, migrations: migrations)
+        try migrateIfNeeded(location: location, keyBlock: keyBlock, creation: creation, migrations: migrations)
     }
     
     public func drain() {
@@ -64,9 +64,7 @@ public final class DatabasePool {
     }
     
     public func execute(_ query: Query) throws {
-        if let delaySeconds = Query.delaySeconds {
-            Thread.sleep(forTimeInterval: delaySeconds)
-        }
+        delayIfNeeded()
         
         let tracing = profiler?.begin(name: "Execute", query.query)
         
@@ -74,13 +72,13 @@ public final class DatabasePool {
             tracing?.end()
         }
         
-        try perform { try $0.execute(query) }
+        try perform { database in
+            try database.execute(query)
+        }
     }
     
     public func executeQuery(_ query: String) throws {
-        if let delaySeconds = Query.delaySeconds {
-            Thread.sleep(forTimeInterval: delaySeconds)
-        }
+        delayIfNeeded()
         
         let tracing = profiler?.begin(name: "Execute Query", query)
         
@@ -88,7 +86,9 @@ public final class DatabasePool {
             tracing?.end()
         }
         
-        try perform { try $0.exec(query: query) }
+        try perform { database in
+            try database.exec(query: query)
+        }
     }
     
     @inlinable
@@ -100,9 +100,7 @@ public final class DatabasePool {
     }
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
-        if let delaySeconds = Query.delaySeconds {
-            Thread.sleep(forTimeInterval: delaySeconds)
-        }
+        delayIfNeeded()
         
         let tracing = profiler?.begin(name: "Fetch", query.query)
         
@@ -110,13 +108,13 @@ public final class DatabasePool {
             tracing?.end()
         }
         
-        try perform { try $0.fetch(query, adaptee: adaptee, using: block) }
+        try perform { database in
+            try database.fetch(query, adaptee: adaptee, using: block)
+        }
     }
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
-        if let delaySeconds = Query.delaySeconds {
-            Thread.sleep(forTimeInterval: delaySeconds)
-        }
+        delayIfNeeded()
         
         let tracing = profiler?.begin(name: "Fetch Once", query.query)
         
@@ -127,12 +125,7 @@ public final class DatabasePool {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
-    private func migrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
-        guard let location = location,
-              let keyBlock = keyBlock else {
-            preconditionFailure("Prepare the pool")
-        }
-        
+    private func migrateIfNeeded(location: Location, keyBlock: KeyBlock, creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
         let migrations = migrations.sorted { $0.version > $1.version }
         
         if let migration = migrations.first, creation.version != migration.version {
@@ -160,6 +153,12 @@ public final class DatabasePool {
     private func perform<T>(action: (_ database: Database) throws -> T) throws -> T {
         var database: Database!
         
+        defer {
+            _ = queue.sync {
+                idles.insert(database)
+            }
+        }
+        
         queue.sync {
             if !idles.isEmpty {
                 database = idles.removeFirst()
@@ -169,19 +168,21 @@ public final class DatabasePool {
         if database == nil {
             guard let location = location,
                   let keyBlock = keyBlock else {
-                preconditionFailure("Prepare the pool")
+                preconditionFailure("Prepare is required")
             }
             
             database = try Database(location: location, key: keyBlock())
         }
         
-        defer {
-            _ = queue.sync {
-                idles.insert(database)
-            }
+        return try action(database)
+    }
+    
+    private func delayIfNeeded() {
+        guard let delaySeconds = Query.delaySeconds else {
+            return
         }
         
-        return try action(database)
+        Thread.sleep(forTimeInterval: delaySeconds)
     }
 }
 
