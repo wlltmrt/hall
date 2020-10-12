@@ -125,6 +125,11 @@ public final class DatabasePool {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
+    private func migrate(_ migration: DatabaseMigrationProtocol.Type, in database: Database) throws {
+        try database.exec(query: "\(migration.migrateQuery())")
+        try database.exec(query: "PRAGMA user_version=\(migration.version)")
+    }
+    
     private func migrateIfNeeded(location: Location, keyBlock: KeyBlock, creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
         let migrations = migrations.sorted { $0.version > $1.version }
         
@@ -135,7 +140,7 @@ public final class DatabasePool {
         let database = try Database(location: location, key: keyBlock())
         
         guard let version: Int = try? database.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
-            try database.exec(query: "\(creation.migrateQuery());PRAGMA user_version=\(creation.version)")
+            try migrate(creation, in: database)
             return
         }
         
@@ -144,7 +149,7 @@ public final class DatabasePool {
                 continue
             }
             
-            try database.exec(query: "\(migration.migrateQuery());PRAGMA user_version=\(migration.version)")
+            try migrate(migration, in: database)
         }
         
         profiler?.debug("Database v\(version)")
