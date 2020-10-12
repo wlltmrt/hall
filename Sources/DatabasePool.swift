@@ -44,9 +44,11 @@ public final class DatabasePool {
     private var profiler: ProfilerProtocol?
     
     private let queue = DispatchQueue(label: "com.database.queue", qos: .utility)
+    private let lock = ReadWriteLock()
+    
     private lazy var idles = Set<Database>()
     
-    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type...) throws {
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type..., using block: (() -> Void)?) throws {
         self.location = location
         self.keyBlock = keyBlock
         
@@ -54,7 +56,10 @@ public final class DatabasePool {
             self.profiler = createProfilerIfSupported(category: "Database")
         }
         
-        try migrateIfNeeded(location: location, keyBlock: keyBlock, creation: creation, migrations: migrations)
+        try lock.write {
+            block?()
+            try migrateIfNeeded(location: location, keyBlock: keyBlock, creation: creation, migrations: migrations)
+        }
     }
     
     public func drain() {
@@ -139,6 +144,10 @@ public final class DatabasePool {
         
         let database = try Database(location: location, key: keyBlock())
         
+        defer {
+            idles.insert(database)
+        }
+        
         guard let version: Int = try? database.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
             try migrate(creation, in: database)
             return
@@ -155,31 +164,33 @@ public final class DatabasePool {
         profiler?.debug("Database v\(version)")
     }
     
-    private func perform<T>(action: (_ database: Database) throws -> T) throws -> T {
-        var database: Database!
-        
-        defer {
-            _ = queue.sync {
-                idles.insert(database)
-            }
-        }
-        
-        queue.sync {
-            if !idles.isEmpty {
-                database = idles.removeFirst()
-            }
-        }
-        
-        if database == nil {
-            guard let location = location,
-                  let keyBlock = keyBlock else {
-                preconditionFailure("Prepare is required")
+    private func perform<T>(action: (_ database: Database) throws -> T) rethrows -> T {
+        return try lock.read {
+            var database: Database!
+            
+            defer {
+                _ = queue.sync {
+                    idles.insert(database)
+                }
             }
             
-            database = try Database(location: location, key: keyBlock())
+            queue.sync {
+                if !idles.isEmpty {
+                    database = idles.removeFirst()
+                }
+            }
+            
+            if database == nil {
+                guard let location = location,
+                      let keyBlock = keyBlock else {
+                    preconditionFailure("Prepare is required")
+                }
+                
+                database = try Database(location: location, key: keyBlock())
+            }
+            
+            return try action(database)
         }
-        
-        return try action(database)
     }
     
     private func delayIfNeeded() {
