@@ -48,7 +48,7 @@ public final class DatabasePool {
     
     private lazy var idles = Set<Database>()
     
-    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type..., using block: (() -> Void)?) throws {
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type..., using block: (() -> Void)? = nil) throws {
         self.location = location
         self.keyBlock = keyBlock
         
