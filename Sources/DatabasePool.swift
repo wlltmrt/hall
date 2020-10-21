@@ -118,7 +118,7 @@ public final class DatabasePool {
         }
     }
     
-    public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
+    public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
         delayIfNeeded()
         
         let tracing = profiler?.begin(name: "Fetch Once", query.query)

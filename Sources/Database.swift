@@ -132,7 +132,7 @@ public final class Database {
         }
     }
     
-    func scalar<T>(query: Query, adaptee: (_ statement: Statement) -> T) throws -> T? {
+    func scalar<T>(query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
         var statementHandle: OpaquePointer? = nil
         var result: CInt = 0
         var item: T?
