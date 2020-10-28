@@ -41,19 +41,19 @@ public final class DatabasePool {
     
     private var location: Location?
     private var keyBlock: KeyBlock?
-    private var profiler: ProfilerProtocol?
+    private var log: Log?
     
     private let queue = DispatchQueue(label: "com.database.queue", qos: .utility)
     private let lock = ReadWriteLock()
     
     private lazy var idles = Set<Database>()
     
-    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableProfiler: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type..., using block: (() -> Void)? = nil) throws {
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableLog: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type..., using block: (() -> Void)? = nil) throws {
         self.location = location
         self.keyBlock = keyBlock
         
-        if enableProfiler {
-            self.profiler = createProfilerIfSupported(category: "Database")
+        if enableLog {
+            self.log = Log(category: "Database")
         }
         
         try lock.write {
@@ -71,7 +71,7 @@ public final class DatabasePool {
     public func execute(_ query: Query) throws {
         delayIfNeeded()
         
-        let tracing = profiler?.begin(name: "Execute", query.query)
+        let tracing = log?.begin(name: "Execute", query.query)
         
         defer {
             tracing?.end()
@@ -85,7 +85,7 @@ public final class DatabasePool {
     public func executeQuery(_ query: String) throws {
         delayIfNeeded()
         
-        let tracing = profiler?.begin(name: "Execute Query", query)
+        let tracing = log?.begin(name: "Execute Query", query)
         
         defer {
             tracing?.end()
@@ -107,7 +107,7 @@ public final class DatabasePool {
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
         delayIfNeeded()
         
-        let tracing = profiler?.begin(name: "Fetch", query.query)
+        let tracing = log?.begin(name: "Fetch", query.query)
         
         defer {
             tracing?.end()
@@ -121,7 +121,7 @@ public final class DatabasePool {
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
         delayIfNeeded()
         
-        let tracing = profiler?.begin(name: "Fetch Once", query.query)
+        let tracing = log?.begin(name: "Fetch Once", query.query)
         
         defer {
             tracing?.end()
@@ -161,7 +161,7 @@ public final class DatabasePool {
             try migrate(migration, in: database)
         }
         
-        profiler?.debug("Database v\(version)")
+        log?.debug("Database v\(version)")
     }
     
     private func perform<T>(action: (_ database: Database) throws -> T) rethrows -> T {
