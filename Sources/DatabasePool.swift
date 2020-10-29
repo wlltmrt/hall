@@ -24,6 +24,7 @@
 
 import Foundation
 import Adrenaline
+import ConcurrentKit
 
 public final class DatabasePool {
     public typealias Location = Database.Location

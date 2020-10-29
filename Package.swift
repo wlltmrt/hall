@@ -39,6 +39,7 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "Adrenaline", url: "https://github.com/wellmart/adrenaline.git", .branch("master")),
+        .package(name: "ConcurrentKit", url: "https://github.com/wellmart/concurrentkit.git", .branch("master")),
         .package(name: "SQLCipher", url: "https://github.com/wellmart/sqlcipher.git", .branch("master"))
     ],
     targets: [
@@ -46,6 +47,7 @@ let package = Package(
             name: "Hall",
             dependencies: [
                 "Adrenaline",
+                "ConcurrentKit",
                 "SQLCipher"
             ],
             path: "Sources",
