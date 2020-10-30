@@ -138,7 +138,7 @@ public final class DatabasePool {
             try migrate(migration, in: database)
         }
         
-        log.debug("Database v%@", version)
+        log.debug("Database v%d", version)
     }
     
     private func perform<T>(action: (_ database: Database) throws -> T) rethrows -> T {
