@@ -42,20 +42,16 @@ public final class DatabasePool {
     
     private var location: Location?
     private var keyBlock: KeyBlock?
-    private var log: Log?
     
-    private let queue = DispatchQueue(label: "com.database.queue", qos: .utility)
     private let lock = ReadWriteLock()
+    private let queue = DispatchQueue(label: "com.database.queue", qos: .utility)
+    private let log = Log(category: "Database")
     
     private lazy var idles = Set<Database>()
     
-    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, enableLog: Bool = false, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type..., using block: (() -> Void)? = nil) throws {
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type..., using block: (() -> Void)? = nil) throws {
         self.location = location
         self.keyBlock = keyBlock
-        
-        if enableLog {
-            self.log = Log(category: "Database")
-        }
         
         try lock.write {
             block?()
@@ -71,12 +67,7 @@ public final class DatabasePool {
     
     public func execute(_ query: Query) throws {
         delayIfNeeded()
-        
-        let tracing = log?.begin(name: "Execute", query.query)
-        
-        defer {
-            tracing?.end()
-        }
+        log.debug("Execute: %@", query.query)
         
         try perform { database in
             try database.execute(query)
@@ -85,12 +76,7 @@ public final class DatabasePool {
     
     public func executeQuery(_ query: String) throws {
         delayIfNeeded()
-        
-        let tracing = log?.begin(name: "Execute Query", query)
-        
-        defer {
-            tracing?.end()
-        }
+        log.debug("Execute Query: %@", query)
         
         try perform { database in
             try database.exec(query: query)
@@ -107,12 +93,7 @@ public final class DatabasePool {
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
         delayIfNeeded()
-        
-        let tracing = log?.begin(name: "Fetch", query.query)
-        
-        defer {
-            tracing?.end()
-        }
+        log.debug("Fetch: %@", query.query)
         
         try perform { database in
             try database.fetch(query, adaptee: adaptee, using: block)
@@ -121,12 +102,7 @@ public final class DatabasePool {
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
         delayIfNeeded()
-        
-        let tracing = log?.begin(name: "Fetch Once", query.query)
-        
-        defer {
-            tracing?.end()
-        }
+        log.debug("Fetch Once: %@", query.query)
         
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
@@ -162,7 +138,7 @@ public final class DatabasePool {
             try migrate(migration, in: database)
         }
         
-        log?.debug("Database v\(version)")
+        log.debug("Database v%@", version)
     }
     
     private func perform<T>(action: (_ database: Database) throws -> T) rethrows -> T {

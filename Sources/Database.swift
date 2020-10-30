@@ -56,7 +56,7 @@ public final class Database {
         }
         
         if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, nil) != SQLITE_OK {
-            throw DatabaseError.unknown(description: "Can't open database: \(path)")
+            throw DatabaseError.trace(.unknown(description: "Can't open database: \(path)"))
         }
         
         try exec(query: "PRAGMA cipher_memory_security=OFF")
@@ -70,7 +70,7 @@ public final class Database {
     
     func exec(query: String) throws {
         if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
-            throw DatabaseError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
     }
     
@@ -90,7 +90,7 @@ public final class Database {
                 sqlite3_finalize(statementHandle)
             }
             else {
-                throw DatabaseError.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle)))
+                throw DatabaseError.trace(.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle))))
             }
         }
         else {
@@ -98,7 +98,7 @@ public final class Database {
         }
         
         if result == SQLITE_ERROR {
-            throw DatabaseError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
     }
     
@@ -124,11 +124,11 @@ public final class Database {
             sqlite3_finalize(statementHandle)
         }
         else {
-            throw DatabaseError.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle)))
+            throw DatabaseError.trace(.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
         
         if result == SQLITE_ERROR {
-            throw DatabaseError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
     }
     
@@ -153,11 +153,11 @@ public final class Database {
             sqlite3_finalize(statementHandle)
         }
         else {
-            throw DatabaseError.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle)))
+            throw DatabaseError.trace(.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
         
         if result == SQLITE_ERROR {
-            throw DatabaseError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
         
         return item
@@ -202,7 +202,7 @@ public final class Database {
         }
         
         if result == SQLITE_ERROR {
-            throw DatabaseError.unknown(description: String(cString: sqlite3_errmsg(databaseHandle)))
+            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
     }
 }

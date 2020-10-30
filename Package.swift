@@ -29,7 +29,7 @@ import PackageDescription
 let package = Package(
     name: "Hall",
     platforms: [
-        .iOS(.v12), .macOS(.v10_14), .watchOS(.v5)
+        .iOS(.v11), .macOS(.v10_13), .watchOS(.v4)
     ],
     products: [
         .library(
