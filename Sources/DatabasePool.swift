@@ -110,7 +110,7 @@ public final class DatabasePool {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
-    public func createIfNeeded(migration: DatabaseMigrationProtocol.Type) throws {
+    public func createIfNeeded(creation: DatabaseMigrationProtocol.Type) throws {
         guard let location = location,
               let keyBlock = keyBlock else {
             preconditionFailure("Database not prepared")
@@ -127,7 +127,7 @@ public final class DatabasePool {
             return
         }
         
-        try migrate(migration, in: database)
+        try migrate(creation, in: database)
     }
     
     public func migrateIfNeeded(migrations: [DatabaseMigrationProtocol.Type]) throws {
