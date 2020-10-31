@@ -40,22 +40,29 @@ public final class DatabasePool {
         return FileManager.default.inApplicationSupportDirectory(with: fileName)
     }
     
+    public private(set) lazy var isPreparing = false
+    
     private var location: Location?
     private var keyBlock: KeyBlock?
     
     private let lock = ReadWriteLock()
     private let queue = DispatchQueue(label: "com.database.queue", qos: .utility)
-    private let log = Log(category: "Database")
+    private let log = Log(category: "Database Pool")
     
     private lazy var idles = Set<Database>()
     
-    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type..., using block: (() -> Void)? = nil) throws {
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, using block: (() -> Void)? = nil) {
         self.location = location
         self.keyBlock = keyBlock
         
-        try lock.write {
+        defer {
+            isPreparing = false
+        }
+        
+        isPreparing = true
+        
+        lock.write {
             block?()
-            try migrateIfNeeded(location: location, keyBlock: keyBlock, creation: creation, migrations: migrations)
         }
     }
     
@@ -107,19 +114,18 @@ public final class DatabasePool {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
-    private func migrate(_ migration: DatabaseMigrationProtocol.Type, in database: Database) throws {
-        try database.exec(query: "\(migration.migrateQuery())")
-        try database.exec(query: "PRAGMA user_version=\(migration.version)")
-    }
-    
-    private func migrateIfNeeded(location: Location, keyBlock: KeyBlock, creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
+    public func migrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type...) throws {
+        guard isPreparing else {
+            preconditionFailure("Migrate only on prepare")
+        }
+        
         let migrations = migrations.sorted { $0.version > $1.version }
         
         if let migration = migrations.first, creation.version != migration.version {
             preconditionFailure("Invalid creation version")
         }
         
-        let database = try Database(location: location, key: keyBlock())
+        let database = try Database(location: location.unsafelyUnwrapped, key: keyBlock.unsafelyUnwrapped())
         
         defer {
             idles.insert(database)
@@ -141,6 +147,11 @@ public final class DatabasePool {
         log.debug("Database v%d", version)
     }
     
+    private func migrate(_ migration: DatabaseMigrationProtocol.Type, in database: Database) throws {
+        try database.exec(query: "BEGIN;\(migration.migrateQuery());COMMIT")
+        try database.exec(query: "PRAGMA user_version=\(migration.version)")
+    }
+    
     private func perform<T>(action: (_ database: Database) throws -> T) rethrows -> T {
         return try lock.read {
             var database: Database!
@@ -160,7 +171,7 @@ public final class DatabasePool {
             if database == nil {
                 guard let location = location,
                       let keyBlock = keyBlock else {
-                    preconditionFailure("Prepare is required")
+                    preconditionFailure("Database not prepared")
                 }
                 
                 database = try Database(location: location, key: keyBlock())

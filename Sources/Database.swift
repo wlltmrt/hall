@@ -56,7 +56,7 @@ public final class Database {
         }
         
         if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, nil) != SQLITE_OK {
-            throw DatabaseError.trace(.unknown(description: "Can't open database: \(path)"))
+            throw DatabaseError.firstChance(.unknown(description: "Can't open database: \(path)"))
         }
         
         try exec(query: "PRAGMA cipher_memory_security=OFF")
@@ -70,7 +70,7 @@ public final class Database {
     
     func exec(query: String) throws {
         if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
-            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
+            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
     }
     
@@ -79,93 +79,85 @@ public final class Database {
         var result: CInt = 0
         
         if let values = query.values {
-            if prepare(to: &statementHandle, query: query.query, result: &result) {
-                let bindCount = sqlite3_bind_parameter_count(statementHandle)
-                
-                for i in 1...bindCount {
-                    try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
-                }
-                
-                step(to: statementHandle, result: &result)
-                sqlite3_finalize(statementHandle)
+            try prepare(to: &statementHandle, query: query.query)
+            
+            let bindCount = sqlite3_bind_parameter_count(statementHandle)
+            
+            for i in 1...bindCount {
+                try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
             }
-            else {
-                throw DatabaseError.trace(.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle))))
-            }
+            
+            step(to: statementHandle, result: &result)
+            sqlite3_finalize(statementHandle)
+            
         }
         else {
             result = sqlite3_exec(databaseHandle, query.query, nil, nil, nil)
         }
         
         if result == SQLITE_ERROR {
-            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
+            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
     }
     
     func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
         var statementHandle: OpaquePointer? = nil
+        try prepare(to: &statementHandle, query: query.query)
+        
+        if let values = query.values {
+            let bindCount = sqlite3_bind_parameter_count(statementHandle)
+            
+            for i in 1...bindCount {
+                try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
+            }
+        }
+        
+        let statement = Statement(handle: statementHandle)
         var result: CInt = 0
         
-        if prepare(to: &statementHandle, query: query.query, result: &result) {
-            if let values = query.values {
-                let bindCount = sqlite3_bind_parameter_count(statementHandle)
-                
-                for i in 1...bindCount {
-                    try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
-                }
-            }
-            
-            let statement = Statement(handle: statementHandle)
-            
-            while step(to: statementHandle, result: &result) {
-                block(adaptee(statement))
-            }
-            
-            sqlite3_finalize(statementHandle)
-        }
-        else {
-            throw DatabaseError.trace(.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle))))
+        while step(to: statementHandle, result: &result) {
+            block(adaptee(statement))
         }
         
+        sqlite3_finalize(statementHandle)
+        
         if result == SQLITE_ERROR {
-            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
+            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
     }
     
     func scalar<T>(query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
         var statementHandle: OpaquePointer? = nil
+        try prepare(to: &statementHandle, query: query.query)
+        
+        if let values = query.values {
+            let bindCount = sqlite3_bind_parameter_count(statementHandle)
+            
+            for i in 1...bindCount {
+                try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
+            }
+        }
+        
         var result: CInt = 0
         var item: T?
         
-        if prepare(to: &statementHandle, query: query.query, result: &result) {
-            if let values = query.values {
-                let bindCount = sqlite3_bind_parameter_count(statementHandle)
-                
-                for i in 1...bindCount {
-                    try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
-                }
-            }
-            
-            if step(to: statementHandle, result: &result) {
-                item = adaptee(Statement(handle: statementHandle))
-            }
-            
-            sqlite3_finalize(statementHandle)
-        }
-        else {
-            throw DatabaseError.trace(.invalidQuery(query: query.query, description: String(cString: sqlite3_errmsg(databaseHandle))))
+        if step(to: statementHandle, result: &result) {
+            item = adaptee(Statement(handle: statementHandle))
         }
         
+        sqlite3_finalize(statementHandle)
+        
         if result == SQLITE_ERROR {
-            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
+            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
         
         return item
     }
     
-    private func prepare(to statementHandle: inout OpaquePointer?, query: String, result: inout CInt) -> Bool {
-        result = sqlite3_prepare_v2(databaseHandle, query, -1, &statementHandle, nil)
-        return result == SQLITE_OK
+    private func prepare(to statementHandle: inout OpaquePointer?, query: String) throws {
+        if sqlite3_prepare_v2(databaseHandle, query, -1, &statementHandle, nil) != SQLITE_OK {
+            throw DatabaseError.firstChance(.invalidQuery(query: query, description: String(cString: sqlite3_errmsg(databaseHandle))))
+        }
     }
     
     @discardableResult
@@ -202,7 +194,7 @@ public final class Database {
         }
         
         if result == SQLITE_ERROR {
-            throw DatabaseError.trace(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
+            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
         }
     }
 }
