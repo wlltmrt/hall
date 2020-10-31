@@ -49,23 +49,17 @@ public final class DatabasePool {
     
     private lazy var idles = Set<Database>()
     
-    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, using block: (() -> Void)? = nil) {
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, using block: ((_ databasePool: DatabasePool) -> Void)? = nil) {
         self.location = location
         self.keyBlock = keyBlock
         
         DispatchQueue.utility.async { [self] in
             lock.write {
-                block?()
+                block?(self)
             }
         }
-    }
-    
-    public func deleteFile() throws {
-        guard let fileUrl = fileUrl else {
-            preconditionFailure("Database not found")
-        }
         
-        try FileManager.default.removeItem(at: fileUrl)
+        usleep(250)
     }
     
     public func drain() {
