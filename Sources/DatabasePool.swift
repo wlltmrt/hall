@@ -40,8 +40,6 @@ public final class DatabasePool {
         return FileManager.default.inApplicationSupportDirectory(with: fileName)
     }
     
-    public private(set) lazy var isPreparing = false
-    
     private var location: Location?
     private var keyBlock: KeyBlock?
     
@@ -55,15 +53,19 @@ public final class DatabasePool {
         self.location = location
         self.keyBlock = keyBlock
         
-        defer {
-            isPreparing = false
+        DispatchQueue.utility.async { [self] in
+            lock.write {
+                block?()
+            }
+        }
+    }
+    
+    public func deleteFile() throws {
+        guard let fileUrl = fileUrl else {
+            preconditionFailure("Database not found")
         }
         
-        isPreparing = true
-        
-        lock.write {
-            block?()
-        }
+        try FileManager.default.removeItem(at: fileUrl)
     }
     
     public func drain() {
@@ -115,8 +117,9 @@ public final class DatabasePool {
     }
     
     public func migrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type...) throws {
-        guard isPreparing else {
-            preconditionFailure("Migrate only on prepare")
+        guard let location = location,
+              let keyBlock = keyBlock else {
+            preconditionFailure("Database not prepared")
         }
         
         let migrations = migrations.sorted { $0.version > $1.version }
@@ -125,7 +128,7 @@ public final class DatabasePool {
             preconditionFailure("Invalid creation version")
         }
         
-        let database = try Database(location: location.unsafelyUnwrapped, key: keyBlock.unsafelyUnwrapped())
+        let database = try Database(location: location, key: keyBlock())
         
         defer {
             idles.insert(database)
