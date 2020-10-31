@@ -110,16 +110,10 @@ public final class DatabasePool {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
-    public func migrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: DatabaseMigrationProtocol.Type...) throws {
+    public func createIfNeeded(migration: DatabaseMigrationProtocol.Type) throws {
         guard let location = location,
               let keyBlock = keyBlock else {
             preconditionFailure("Database not prepared")
-        }
-        
-        let migrations = migrations.sorted { $0.version > $1.version }
-        
-        if let migration = migrations.first, creation.version != migration.version {
-            preconditionFailure("Invalid creation version")
         }
         
         let database = try Database(location: location, key: keyBlock())
@@ -128,20 +122,34 @@ public final class DatabasePool {
             idles.insert(database)
         }
         
-        guard let version: Int = try? database.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
-            try migrate(creation, in: database)
+        if let version: Int = try? database.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 {
+            log.debug("Database v%d", version)
             return
         }
         
-        for migration in migrations {
-            guard version < migration.version else {
-                continue
-            }
-            
-            try migrate(migration, in: database)
+        try migrate(migration, in: database)
+    }
+    
+    public func migrateIfNeeded(migrations: [DatabaseMigrationProtocol.Type]) throws {
+        guard let location = location,
+              let keyBlock = keyBlock else {
+            preconditionFailure("Database not prepared")
         }
         
-        log.debug("Database v%d", version)
+        let database = try Database(location: location, key: keyBlock())
+        let migrations = migrations.sorted { $0.version > $1.version }
+        
+        defer {
+            idles.insert(database)
+        }
+        
+        guard let version: Int = try? database.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }) else {
+            preconditionFailure("Database not created")
+        }
+        
+        for migration in migrations where version < migration.version {
+            try migrate(migration, in: database)
+        }
     }
     
     private func migrate(_ migration: DatabaseMigrationProtocol.Type, in database: Database) throws {
