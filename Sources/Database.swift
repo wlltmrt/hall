@@ -133,6 +133,10 @@ public final class Database {
         
         var migrations = schema.migrations.sorted { $0.version < $1.version }
         
+        if schema.version < version {
+            throw DatabaseError.firstChance(.unknown(description: "Database v\(version) not supported"))
+        }
+        
         if let migration = migrations.last, schema.version != migration.version {
             preconditionFailure("Invalid schema version")
         }
