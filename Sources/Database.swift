@@ -24,187 +24,211 @@
 
 import Foundation
 import Adrenaline
-import SQLCipher
-
-public enum DatabaseError: Error {
-    case invalidQuery(query: String, description: String)
-    case unknown(description: String)
-}
+import ConcurrentKit
 
 public final class Database {
-    public enum Location {
-        case memory
-        case file(fileName: String)
+    public typealias Location = DatabaseConnection.Location
+    public typealias KeyBlock = () -> String
+    
+    public static let `default` = Database()
+    
+    public var fileUrl: URL? {
+        guard case let .file(fileName) = location else {
+            return nil
+        }
+        
+        return FileManager.default.inApplicationSupportDirectory(with: fileName)
     }
     
-    private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    private var databaseHandle: OpaquePointer?
+    let log = Log(category: "Database")
     
-    init(location: Location, key: String) throws {
-        let path: String
-        
-        switch location {
-        case let .file(fileName):
-            path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
-            
-        case .memory:
-            path = ":memory:"
-        }
-        
-        if let databaseHandle = databaseHandle {
-            sqlite3_close_v2(databaseHandle)
-        }
-        
-        if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, nil) != SQLITE_OK {
-            throw DatabaseError.firstChance(.unknown(description: "Can't open database: \(path)"))
-        }
-        
-        try exec(query: "PRAGMA cipher_memory_security=OFF")
-        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
-    }
+    private var location: Location?
+    private var keyBlock: KeyBlock?
     
-    deinit {
-        sqlite3_close_v2(databaseHandle)
-        databaseHandle = nil
-    }
+    private let lock = ReadWriteLock()
+    private let queue = DispatchQueue(label: "com.database.queue", qos: .utility)
     
-    func exec(query: String) throws {
-        if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
-            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
-        }
-    }
+    private lazy var idles = Set<DatabaseConnection>()
     
-    func execute(_ query: Query) throws {
-        var statementHandle: OpaquePointer? = nil
-        var result: CInt = 0
+    public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, using block: ((_ database: Database) -> Void)? = nil) {
+        self.location = location
+        self.keyBlock = keyBlock
         
-        if let values = query.values {
-            try prepare(to: &statementHandle, query: query.query)
-            
-            let bindCount = sqlite3_bind_parameter_count(statementHandle)
-            
-            for i in 1...bindCount {
-                try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
-            }
-            
-            step(to: statementHandle, result: &result)
-            sqlite3_finalize(statementHandle)
-            
-        }
-        else {
-            result = sqlite3_exec(databaseHandle, query.query, nil, nil, nil)
-        }
-        
-        if result == SQLITE_ERROR {
-            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
-        }
-    }
-    
-    func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
-        var statementHandle: OpaquePointer? = nil
-        try prepare(to: &statementHandle, query: query.query)
-        
-        if let values = query.values {
-            let bindCount = sqlite3_bind_parameter_count(statementHandle)
-            
-            for i in 1...bindCount {
-                try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
+        DispatchQueue.utility.async { [self] in
+            lock.write {
+                block?(self)
             }
         }
         
-        let statement = Statement(handle: statementHandle)
-        var result: CInt = 0
-        
-        while step(to: statementHandle, result: &result) {
-            block(adaptee(statement))
-        }
-        
-        sqlite3_finalize(statementHandle)
-        
-        if result == SQLITE_ERROR {
-            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
+        usleep(250)
+    }
+    
+    public func drain() {
+        queue.sync {
+            idles.removeAll(keepingCapacity: false)
         }
     }
     
-    func scalar<T>(query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
-        var statementHandle: OpaquePointer? = nil
-        try prepare(to: &statementHandle, query: query.query)
+    public func execute(_ query: Query) throws {
+        delayIfNeeded()
+        log.debug("Execute: %@", query.query)
         
-        if let values = query.values {
-            let bindCount = sqlite3_bind_parameter_count(statementHandle)
+        try perform {
+            try $0.execute(query)
+        }
+    }
+    
+    public func executeQuery(_ query: String) throws {
+        delayIfNeeded()
+        log.debug("Execute Query: %@", query)
+        
+        try perform {
+            try $0.exec(query: query)
+        }
+    }
+    
+    @inlinable
+    public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T) throws -> [T] {
+        var items = [T]()
+        
+        try fetch(query, adaptee: adaptee) {
+            items.append($0)
+        }
+        
+        return items
+    }
+    
+    public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
+        delayIfNeeded()
+        log.debug("Fetch: %@", query.query)
+        
+        try perform {
+            try $0.fetch(query, adaptee: adaptee, using: block)
+        }
+    }
+    
+    public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
+        delayIfNeeded()
+        log.debug("Fetch Once: %@", query.query)
+        
+        return try perform { try $0.scalar(query: query, adaptee: adaptee) }
+    }
+    
+    public func createIfNeeded(creation: DatabaseMigrationProtocol.Type) throws {
+        guard let location = location,
+              let keyBlock = keyBlock else {
+            preconditionFailure("Database not prepared")
+        }
+        
+        let connection = try DatabaseConnection(location: location, key: keyBlock())
+        
+        defer {
+            idles.insert(connection)
+        }
+        
+        if let version: Int = try? connection.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 {
+            log.debug("Database v%d", version)
+            return
+        }
+        
+        try migrate(creation, in: connection)
+    }
+    
+    public func createAndMigrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
+        guard let location = location,
+              let keyBlock = keyBlock else {
+            preconditionFailure("Database not prepared")
+        }
+        
+        try createIfNeeded(creation: creation)
+        
+        let connection = try DatabaseConnection(location: location, key: keyBlock())
+        let migrations = migrations.sorted { $0.version > $1.version }
+        
+        defer {
+            idles.insert(connection)
+        }
+        
+        guard let version: Int = try? connection.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }) else {
+            preconditionFailure("Database not created")
+        }
+        
+        for migration in migrations where version < migration.version {
+            try migrate(migration, in: connection)
+        }
+    }
+    
+    private func migrate(_ migration: DatabaseMigrationProtocol.Type, in connection: DatabaseConnection) throws {
+        try connection.exec(query: "BEGIN;\(migration.migrateQuery());COMMIT")
+        try connection.exec(query: "PRAGMA user_version=\(migration.version)")
+    }
+    
+    private func perform<T>(action: (_ connection: DatabaseConnection) throws -> T) rethrows -> T {
+        return try lock.read {
+            var connection: DatabaseConnection!
             
-            for i in 1...bindCount {
-                try bind(to: statementHandle, value: values[Int(i) - 1], at: i)
+            defer {
+                _ = queue.sync {
+                    idles.insert(connection)
+                }
             }
-        }
-        
-        var result: CInt = 0
-        var item: T?
-        
-        if step(to: statementHandle, result: &result) {
-            item = adaptee(Statement(handle: statementHandle))
-        }
-        
-        sqlite3_finalize(statementHandle)
-        
-        if result == SQLITE_ERROR {
-            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
-        }
-        
-        return item
-    }
-    
-    private func prepare(to statementHandle: inout OpaquePointer?, query: String) throws {
-        if sqlite3_prepare_v2(databaseHandle, query, -1, &statementHandle, nil) != SQLITE_OK {
-            throw DatabaseError.firstChance(.invalidQuery(query: query, description: String(cString: sqlite3_errmsg(databaseHandle))))
-        }
-    }
-    
-    @discardableResult
-    private func step(to statementHandle: OpaquePointer?, result: inout CInt) -> Bool {
-        return sqlite3_step(statementHandle) == SQLITE_ROW
-    }
-    
-    private func bind(to statementHandle: OpaquePointer?, value: Value?, at index: CInt) throws {
-        var result: CInt
-        
-        switch value {
-        case let integer as Int:
-            result = sqlite3_bind_int64(statementHandle, index, Int64(integer))
             
-        case let string as String:
-            result = sqlite3_bind_text(statementHandle, index, string, -1, Database.SQLITE_TRANSIENT)
-            
-        case let double as Double:
-            result = sqlite3_bind_double(statementHandle, index, double)
-            
-        case let bool as Bool:
-            result = sqlite3_bind_int(statementHandle, index, !bool ? 0 : 1)
-            
-        case let date as Date:
-            result = sqlite3_bind_double(statementHandle, index, date.timeIntervalSinceReferenceDate)
-            
-        case let data as Data:
-            result = data.withUnsafeBytes {
-                sqlite3_bind_blob(statementHandle, index, $0.baseAddress, Int32($0.count), Database.SQLITE_TRANSIENT)
+            queue.sync {
+                if !idles.isEmpty {
+                    connection = idles.removeFirst()
+                }
             }
             
-        default:
-            result = sqlite3_bind_null(statementHandle, index)
+            if connection == nil {
+                guard let location = location,
+                      let keyBlock = keyBlock else {
+                    preconditionFailure("Database not prepared")
+                }
+                
+                connection = try DatabaseConnection(location: location, key: keyBlock())
+            }
+            
+            return try action(connection)
+        }
+    }
+    
+    private func delayIfNeeded() {
+        guard let delaySeconds = Query.delaySeconds else {
+            return
         }
         
-        if result == SQLITE_ERROR {
-            throw DatabaseError.firstChance(.unknown(description: String(cString: sqlite3_errmsg(databaseHandle))))
-        }
+        Thread.sleep(forTimeInterval: delaySeconds)
     }
 }
 
-extension Database: Hashable {
-    public static func == (lhs: Database, rhs: Database) -> Bool {
-        lhs.databaseHandle == rhs.databaseHandle
+public extension Database {
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Bool) throws -> Bool {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
     }
     
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(databaseHandle.hashValue)
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Data) throws -> Data {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Date) throws -> Date {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Double) throws -> Double {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> Int) throws -> Int {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
+    }
+    
+    @inlinable
+    func fetchValue(_ query: Query, defaultValue defaultBlock: @autoclosure () -> String) throws -> String {
+        return try fetchOnce(query) { $0[0] } ?? defaultBlock()
     }
 }
