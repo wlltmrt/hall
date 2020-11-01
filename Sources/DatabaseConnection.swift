@@ -26,11 +26,6 @@ import Foundation
 import Adrenaline
 import SQLCipher
 
-public enum DatabaseError: Error {
-    case invalidQuery(query: String, description: String)
-    case unknown(description: String)
-}
-
 public final class DatabaseConnection {
     public enum Location {
         case memory

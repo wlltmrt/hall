@@ -114,7 +114,7 @@ public final class Database {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
-    public func createOrMigrateIfNeeded(schema: DatabaseSchemaProtocol.Type) throws {
+    public func createOrMigrateIfNeeded(schema: DatabaseSchemaProtocol.Type, prepareMigration: (() -> Void)? = nil) throws {
         guard let location = location,
               let keyBlock = keyBlock else {
             preconditionFailure("Database not prepared")
@@ -143,6 +143,8 @@ public final class Database {
             log.debug("Database v%d", version)
             return
         }
+        
+        prepareMigration?()
         
         for migration in migrations {
             try migrate(migration, in: connection)
@@ -174,7 +176,7 @@ public final class Database {
         try connection.exec(query: "BEGIN;\(migration.migrateQuery());COMMIT")
         try connection.exec(query: "PRAGMA user_version=\(version)")
         
-        log.debug("Migration to v%d success", version)
+        log.debug("Migration v%d success", version)
     }
     
     private func perform<T>(action: (_ connection: DatabaseConnection) throws -> T) rethrows -> T {
