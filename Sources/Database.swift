@@ -134,28 +134,30 @@ public final class Database {
         try migrate(creation, in: connection)
     }
     
-    public func createAndMigrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
+    public func createOrMigrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
         guard let location = location,
               let keyBlock = keyBlock else {
             preconditionFailure("Database not prepared")
         }
         
-        try createIfNeeded(creation: creation)
-        
         let connection = try DatabaseConnection(location: location, key: keyBlock())
-        let migrations = migrations.sorted { $0.version > $1.version }
         
         defer {
             idles.insert(connection)
         }
         
-        guard let version: Int = try? connection.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }) else {
-            preconditionFailure("Database not created")
+        guard let version: Int = try? connection.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
+            try migrate(creation, in: connection)
+            return
         }
+        
+        let migrations = migrations.sorted { $0.version > $1.version }
         
         for migration in migrations where version < migration.version {
             try migrate(migration, in: connection)
         }
+        
+        log.debug("Database v%d", version)
     }
     
     private func migrate(_ migration: DatabaseMigrationProtocol.Type, in connection: DatabaseConnection) throws {
