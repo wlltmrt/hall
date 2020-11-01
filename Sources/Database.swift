@@ -114,7 +114,7 @@ public final class Database {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
-    public func createOrMigrateIfNeeded(schema: DatabaseSchemaProtocol.Type, prepareMigration: (() -> Void)? = nil) throws {
+    public func createOrMigrateIfNeeded(schema: DatabaseSchemaProtocol.Type, willMigrate: (() -> Void)? = nil) throws {
         guard let location = location,
               let keyBlock = keyBlock else {
             preconditionFailure("Database not prepared")
@@ -144,7 +144,7 @@ public final class Database {
             return
         }
         
-        prepareMigration?()
+        willMigrate?()
         
         for migration in migrations {
             try migrate(migration, in: connection)
