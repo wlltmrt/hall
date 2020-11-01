@@ -24,8 +24,6 @@
 
 import Foundation
 
-public protocol DatabaseMigrationProtocol: class {
-    static var version: Int { get }
-    
-    static func migrateQuery() -> String
+public protocol DatabaseSchemaProtocol: DatabaseMigrationProtocol {
+    static var migrations: [DatabaseMigrationProtocol.Type] { get }
 }

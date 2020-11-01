@@ -114,27 +114,7 @@ public final class Database {
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
     
-    public func createIfNeeded(creation: DatabaseMigrationProtocol.Type) throws {
-        guard let location = location,
-              let keyBlock = keyBlock else {
-            preconditionFailure("Database not prepared")
-        }
-        
-        let connection = try DatabaseConnection(location: location, key: keyBlock())
-        
-        defer {
-            idles.insert(connection)
-        }
-        
-        if let version: Int = try? connection.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 {
-            log.debug("Database v%d", version)
-            return
-        }
-        
-        try migrate(creation, in: connection)
-    }
-    
-    public func createOrMigrateIfNeeded(creation: DatabaseMigrationProtocol.Type, migrations: [DatabaseMigrationProtocol.Type]) throws {
+    public func createOrMigrateIfNeeded(schema: DatabaseSchemaProtocol.Type) throws {
         guard let location = location,
               let keyBlock = keyBlock else {
             preconditionFailure("Database not prepared")
@@ -147,22 +127,54 @@ public final class Database {
         }
         
         guard let version: Int = try? connection.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
-            try migrate(creation, in: connection)
+            try migrate(schema, in: connection)
             return
         }
         
-        let migrations = migrations.sorted { $0.version > $1.version }
+        var migrations = schema.migrations.sorted { $0.version < $1.version }
         
-        for migration in migrations where version < migration.version {
-            try migrate(migration, in: connection)
+        if let migration = migrations.last, schema.version != migration.version {
+            preconditionFailure("Invalid schema version")
         }
         
-        log.debug("Database v%d", version)
+        migrations = migrations.filter { $0.version > version }
+        
+        guard !migrations.isEmpty else {
+            log.debug("Database v%d", version)
+            return
+        }
+        
+        for migration in migrations {
+            try migrate(migration, in: connection)
+        }
+    }
+    
+    public func recreate(schema: DatabaseSchemaProtocol.Type) throws {
+        guard let location = location,
+              let keyBlock = keyBlock else {
+            preconditionFailure("Database not prepared")
+        }
+        
+        if let fileUrl = fileUrl {
+            try FileManager.default.removeItem(at: fileUrl)
+        }
+        
+        let connection = try DatabaseConnection(location: location, key: keyBlock())
+        
+        defer {
+            idles.insert(connection)
+        }
+        
+        try migrate(schema, in: connection)
     }
     
     private func migrate(_ migration: DatabaseMigrationProtocol.Type, in connection: DatabaseConnection) throws {
+        let version = migration.version
+        
         try connection.exec(query: "BEGIN;\(migration.migrateQuery());COMMIT")
-        try connection.exec(query: "PRAGMA user_version=\(migration.version)")
+        try connection.exec(query: "PRAGMA user_version=\(version)")
+        
+        log.debug("Migration to v%d success", version)
     }
     
     private func perform<T>(action: (_ connection: DatabaseConnection) throws -> T) rethrows -> T {
