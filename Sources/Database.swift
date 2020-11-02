@@ -80,7 +80,7 @@ public final class Database {
     
     public func executeQuery(_ query: String) throws {
         delayIfNeeded()
-        log.debug("Execute Query: %@", query)
+        log.debug("Execute query: %@", query)
         
         try perform {
             try $0.exec(query: query)
@@ -109,7 +109,7 @@ public final class Database {
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
         delayIfNeeded()
-        log.debug("Fetch Once: %@", query.query)
+        log.debug("Fetch once: %@", query.query)
         
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
