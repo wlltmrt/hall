@@ -39,11 +39,11 @@ public final class DatabaseConnection {
         let path: String
         
         switch location {
-        case let .file(fileName):
-            path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
-            
         case .memory:
             path = ":memory:"
+            
+        case let .file(fileName):
+            path = FileManager.default.inApplicationSupportDirectory(with: fileName).path
         }
         
         if let databaseHandle = databaseHandle {
@@ -85,7 +85,6 @@ public final class DatabaseConnection {
             
             step(to: statementHandle, result: &result)
             sqlite3_finalize(statementHandle)
-            
         }
         else {
             result = sqlite3_exec(databaseHandle, query.query, nil, nil, nil)
