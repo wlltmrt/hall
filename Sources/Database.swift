@@ -40,13 +40,12 @@ public final class Database {
         return FileManager.default.inApplicationSupportDirectory(with: fileName)
     }
     
-    let log = Log(category: "Database")
-    
     private var location: Location?
     private var keyBlock: KeyBlock?
     
     private let lock = ReadWriteLock()
-    private let queue = DispatchQueue(label: "com.database.queue", qos: .utility)
+    private let log = Log(category: "Database")
+    private let queue = DispatchQueue(label: "com.database.queue", qos: .userInitiated)
     
     private lazy var idles = Set<DatabaseConnection>()
     
@@ -120,7 +119,7 @@ public final class Database {
             preconditionFailure("Database not prepared")
         }
         
-        let connection = try DatabaseConnection(location: location, key: keyBlock())
+        let connection = try DatabaseConnection(location: location, log: log, key: keyBlock())
         
         defer {
             idles.insert(connection)
@@ -168,7 +167,7 @@ public final class Database {
             try FileManager.default.removeItem(at: fileUrl)
         }
         
-        let connection = try DatabaseConnection(location: location, key: keyBlock())
+        let connection = try DatabaseConnection(location: location, log: log, key: keyBlock())
         
         defer {
             idles.insert(connection)
@@ -208,7 +207,7 @@ public final class Database {
                     preconditionFailure("Database not prepared")
                 }
                 
-                connection = try DatabaseConnection(location: location, key: keyBlock())
+                connection = try DatabaseConnection(location: location, log: log, key: keyBlock())
             }
             
             return try action(connection)
