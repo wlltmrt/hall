@@ -63,6 +63,8 @@ public final class Database {
     }
     
     public func drain() {
+        log.debug("Drain")
+        
         queue.sync {
             idles.removeAll(keepingCapacity: false)
         }
