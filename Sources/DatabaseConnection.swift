@@ -34,10 +34,10 @@ public final class DatabaseConnection {
     
     private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     
-    private let log: Log
+    private let log: Log?
     private var databaseHandle: OpaquePointer?
     
-    init(location: Location, log: Log, key: String) throws {
+    init(location: Location, key: String, log: Log?) throws {
         let path: String
         
         self.log = log
@@ -55,7 +55,7 @@ public final class DatabaseConnection {
         }
         
         if sqlite3_open_v2(path, &databaseHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, nil) != SQLITE_OK {
-            log.debug("🔶 ERROR: Can't open database")
+            log?.debug("🔶 ERROR: Can't open database")
             throw DatabaseError.firstChance(.unknown(description: "Can't open database: \(path)"))
         }
         
@@ -157,7 +157,7 @@ public final class DatabaseConnection {
         if sqlite3_prepare_v2(databaseHandle, query, -1, &statementHandle, nil) != SQLITE_OK {
             let description = String(cString: sqlite3_errmsg(databaseHandle))
             
-            log.debug("🔶 ERROR: %@", description)
+            log?.debug("🔶 ERROR: %@", description)
             throw DatabaseError.firstChance(.invalidQuery(query: query, description: description))
         }
     }
@@ -203,7 +203,7 @@ public final class DatabaseConnection {
     private func unknownError(callStackSymbols: [String] = Thread.callStackSymbols) -> Error {
         let description = String(cString: sqlite3_errmsg(databaseHandle))
         
-        log.debug("🔶 ERROR: %@", description)
+        log?.debug("🔶 ERROR: %@", description)
         return DatabaseError.firstChance(.unknown(description: description), callStackSymbols: callStackSymbols)
     }
 }

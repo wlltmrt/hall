@@ -63,7 +63,7 @@ public final class Database {
     }
     
     public func drain() {
-        log.debug("Drain")
+        log?.debug("Drain")
         
         queue.sync {
             idles.removeAll(keepingCapacity: false)
@@ -72,7 +72,7 @@ public final class Database {
     
     public func execute(_ query: Query) throws {
         delayIfNeeded()
-        log.debug("Execute: %@", query.query)
+        log?.debug("Execute: %@", query.query)
         
         try perform {
             try $0.execute(query)
@@ -81,7 +81,7 @@ public final class Database {
     
     public func executeQuery(_ query: String) throws {
         delayIfNeeded()
-        log.debug("Execute query: %@", query)
+        log?.debug("Execute query: %@", query)
         
         try perform {
             try $0.exec(query: query)
@@ -101,7 +101,7 @@ public final class Database {
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
         delayIfNeeded()
-        log.debug("Fetch: %@", query.query)
+        log?.debug("Fetch: %@", query.query)
         
         try perform {
             try $0.fetch(query, adaptee: adaptee, using: block)
@@ -110,7 +110,7 @@ public final class Database {
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
         delayIfNeeded()
-        log.debug("Fetch once: %@", query.query)
+        log?.debug("Fetch once: %@", query.query)
         
         return try perform { try $0.scalar(query: query, adaptee: adaptee) }
     }
@@ -121,7 +121,7 @@ public final class Database {
             preconditionFailure("Database not prepared")
         }
         
-        let connection = try DatabaseConnection(location: location, log: log, key: keyBlock())
+        let connection = try DatabaseConnection(location: location, key: keyBlock(), log: log)
         
         defer {
             idles.insert(connection)
@@ -141,14 +141,14 @@ public final class Database {
         if schema.version < version {
             let description = "Database v\(version) not supported"
             
-            log.debug("🔶 ERROR: %@", description)
+            log?.debug("🔶 ERROR: %@", description)
             throw DatabaseError.firstChance(.unknown(description: description))
         }
         
         migrations = migrations.filter { $0.version > version }
         
         guard !migrations.isEmpty else {
-            log.debug("Database v%d", version)
+            log?.debug("Database v%d", version)
             return
         }
         
@@ -169,7 +169,7 @@ public final class Database {
             try FileManager.default.removeItem(at: fileUrl)
         }
         
-        let connection = try DatabaseConnection(location: location, log: log, key: keyBlock())
+        let connection = try DatabaseConnection(location: location, key: keyBlock(), log: log)
         
         defer {
             idles.insert(connection)
@@ -184,7 +184,7 @@ public final class Database {
         try connection.exec(query: "BEGIN;\(migration.migrateQuery());COMMIT")
         try connection.exec(query: "PRAGMA user_version=\(version)")
         
-        log.debug("Migration v%d success", version)
+        log?.debug("Migration v%d success", version)
     }
     
     private func perform<T>(action: (_ connection: DatabaseConnection) throws -> T) rethrows -> T {
@@ -209,7 +209,7 @@ public final class Database {
                     preconditionFailure("Database not prepared")
                 }
                 
-                connection = try DatabaseConnection(location: location, log: log, key: keyBlock())
+                connection = try DatabaseConnection(location: location, key: keyBlock(), log: log)
             }
             
             return try action(connection)
