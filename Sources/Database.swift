@@ -24,7 +24,6 @@
 
 import Foundation
 import Adrenaline
-import ConcurrentKit
 
 public final class Database {
     public typealias Location = DatabaseConnection.Location
