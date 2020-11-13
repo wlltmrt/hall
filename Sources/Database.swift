@@ -23,6 +23,7 @@
 //
 
 import Foundation
+import ConcurrentKit
 import Adrenaline
 
 public final class Database {

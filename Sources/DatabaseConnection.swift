@@ -24,6 +24,7 @@
 
 import Foundation
 import Adrenaline
+import ConcurrentKit
 import SQLCipher
 
 public final class DatabaseConnection {
