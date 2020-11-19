@@ -71,19 +71,19 @@ public final class Database {
     }
     
     public func execute(_ query: Query) throws {
-        delayIfNeeded()
-        log?.debug("Execute: %@", query.query)
-        
         try perform {
+            delayIfNeeded()
+            log?.debug("Execute: %@", query.query)
+            
             try $0.execute(query)
         }
     }
     
     public func executeQuery(_ query: String) throws {
-        delayIfNeeded()
-        log?.debug("Execute query: %@", query)
-        
         try perform {
+            delayIfNeeded()
+            log?.debug("Execute query: %@", query)
+            
             try $0.exec(query: query)
         }
     }
@@ -100,19 +100,21 @@ public final class Database {
     }
     
     public func fetch<T>(_ query: Query, adaptee: (_ statement: Statement) -> T, using block: (T) -> Void) throws {
-        delayIfNeeded()
-        log?.debug("Fetch: %@", query.query)
-        
         try perform {
+            delayIfNeeded()
+            log?.debug("Fetch: %@", query.query)
+            
             try $0.fetch(query, adaptee: adaptee, using: block)
         }
     }
     
     public func fetchOnce<T>(_ query: Query, adaptee: (_ statement: Statement) -> T?) throws -> T? {
-        delayIfNeeded()
-        log?.debug("Fetch once: %@", query.query)
-        
-        return try perform { try $0.scalar(query: query, adaptee: adaptee) }
+        return try perform {
+            delayIfNeeded()
+            log?.debug("Fetch once: %@", query.query)
+            
+            return try $0.scalar(query: query, adaptee: adaptee)
+        }
     }
     
     public func createOrMigrateIfNeeded(schema: DatabaseSchemaProtocol.Type, willMigrate: (() -> Void)? = nil) throws {
