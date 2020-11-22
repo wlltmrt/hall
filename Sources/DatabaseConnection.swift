@@ -60,7 +60,6 @@ public final class DatabaseConnection {
             throw DatabaseError.firstChance(.unknown(description: "Can't open database: \(path)"))
         }
         
-        try exec(query: "PRAGMA cipher_memory_security=OFF")
         sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
     }
     
