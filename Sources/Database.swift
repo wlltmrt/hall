@@ -49,6 +49,9 @@ public final class Database {
     
     private lazy var idles = Set<DatabaseConnection>()
     
+    private init() {
+    }
+    
     public func prepare(location: Location = .file(fileName: "Default.sqlite"), key keyBlock: @autoclosure @escaping KeyBlock, using block: ((_ database: Database) -> Void)? = nil) {
         self.location = location
         self.keyBlock = keyBlock
