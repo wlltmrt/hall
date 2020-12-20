@@ -157,7 +157,6 @@ public final class DatabaseConnection {
         let tableName = "__hall\(databaseHandle.hashValue)__"
         let key = keyBlock()
         
-        try exec(query: "PRAGMA cipher_memory_security=OFF")
         sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
         
         if sqlite3_exec(databaseHandle, "CREATE TABLE \(tableName)(t);DROP TABLE \(tableName)", nil, nil, nil) == SQLITE_NOTADB {
