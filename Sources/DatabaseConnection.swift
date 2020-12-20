@@ -68,6 +68,15 @@ public final class DatabaseConnection {
         databaseHandle = nil
     }
     
+    func checkCipher() throws {
+        let tableName = "__hall\(databaseHandle.hashValue)__"
+        
+        if sqlite3_exec(databaseHandle, "CREATE TABLE \(tableName)(t);DROP TABLE \(tableName)", nil, nil, nil) == SQLITE_NOTADB {
+            log?.debug("🔶 ERROR: Invalid key")
+            throw DatabaseError.firstChance(.verificationFailed(description: "Invalid key"))
+        }
+    }
+    
     func exec(query: String) throws {
         if sqlite3_exec(databaseHandle, query, nil, nil, nil) == SQLITE_ERROR {
             throw unknownError()
@@ -153,18 +162,6 @@ public final class DatabaseConnection {
         return item
     }
     
-    private func prepareCipher(keyBlock: @escaping Database.KeyBlock) throws {
-        let tableName = "__hall\(databaseHandle.hashValue)__"
-        let key = keyBlock()
-        
-        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
-        
-        if sqlite3_exec(databaseHandle, "CREATE TABLE \(tableName)(t);DROP TABLE \(tableName)", nil, nil, nil) == SQLITE_NOTADB {
-            log?.debug("🔶 ERROR: Invalid key")
-            throw DatabaseError.firstChance(.verificationFailed(description: "Invalid key"))
-        }
-    }
-    
     private func prepare(to statementHandle: inout OpaquePointer?, query: String) throws {
         if sqlite3_prepare_v2(databaseHandle, query, -1, &statementHandle, nil) != SQLITE_OK {
             let description = String(cString: sqlite3_errmsg(databaseHandle))
@@ -172,6 +169,13 @@ public final class DatabaseConnection {
             log?.debug("🔶 ERROR: %@", description)
             throw DatabaseError.firstChance(.invalidQuery(query: query, description: description))
         }
+    }
+    
+    private func prepareCipher(keyBlock: @escaping Database.KeyBlock) throws {
+        let key = keyBlock()
+        
+        try exec(query: "PRAGMA cipher_memory_security=OFF")
+        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
     }
     
     @discardableResult

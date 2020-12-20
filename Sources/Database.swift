@@ -139,9 +139,10 @@ public final class Database {
         }
         #endif
         
-        try performUnsafe {
-            try createOrMigrateIfNeeded(connection: $0, schema: schema, willMigrate: willMigrate)
-            try existsTables(schema, in: $0)
+        try performUnsafe { connection in
+            try connection.checkCipher()
+            try createOrMigrateIfNeeded(connection: connection, schema: schema, willMigrate: willMigrate)
+            try existsTables(schema, in: connection)
         }
     }
     
@@ -152,13 +153,13 @@ public final class Database {
         }
         #endif
         
-        try performUnsafe {
+        try performUnsafe { connection in
             if let fileUrl = fileUrl {
                 try FileManager.default.removeItem(at: fileUrl)
             }
             
-            try migrate(schema, in: $0)
-            try existsTables(schema, in: $0)
+            try migrate(schema, in: connection)
+            try existsTables(schema, in: connection)
         }
     }
     
