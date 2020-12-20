@@ -38,7 +38,7 @@ public final class DatabaseConnection {
     private let log: Log?
     private var databaseHandle: OpaquePointer?
     
-    init(location: Location, key: String, log: Log?) throws {
+    init(location: Location, keyBlock: @escaping Database.KeyBlock, log: Log?) throws {
         let path: String
         
         self.log = log
@@ -60,7 +60,7 @@ public final class DatabaseConnection {
             throw DatabaseError.firstChance(.unknown(description: "Can't open database: \(path)"))
         }
         
-        try cipherKey(key)
+        try prepareCipher(keyBlock: keyBlock)
     }
     
     deinit {
@@ -153,14 +153,16 @@ public final class DatabaseConnection {
         return item
     }
     
-    private func cipherKey(_ key: String) throws {
+    private func prepareCipher(keyBlock: @escaping Database.KeyBlock) throws {
         let tableName = "__hall\(databaseHandle.hashValue)__"
+        let key = keyBlock()
         
         try exec(query: "PRAGMA cipher_memory_security=OFF")
         sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
         
         if sqlite3_exec(databaseHandle, "CREATE TABLE \(tableName)(t);DROP TABLE \(tableName)", nil, nil, nil) == SQLITE_NOTADB {
-            throw DatabaseError.verificationFailed(description: "Invalid key")
+            log?.debug("🔶 ERROR: Invalid key")
+            throw DatabaseError.firstChance(.verificationFailed(description: "Invalid key"))
         }
     }
     

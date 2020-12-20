@@ -251,7 +251,7 @@ public final class Database {
                     preconditionFailure("Database not prepared")
                 }
                 
-                connection = try DatabaseConnection(location: location, key: keyBlock(), log: log)
+                connection = try DatabaseConnection(location: location, keyBlock: keyBlock, log: log)
             }
             
             return try action(connection)
@@ -275,7 +275,7 @@ public final class Database {
                 preconditionFailure("Database not prepared")
             }
             
-            connection = try DatabaseConnection(location: location, key: keyBlock(), log: log)
+            connection = try DatabaseConnection(location: location, keyBlock: keyBlock, log: log)
         }
         
         return try action(connection)
