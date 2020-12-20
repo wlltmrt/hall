@@ -49,6 +49,10 @@ public final class Database {
     
     private lazy var idles = Set<DatabaseConnection>()
     
+    #if DEBUG
+    private lazy var isPreparing = false
+    #endif
+    
     private init() {
     }
     
@@ -58,7 +62,15 @@ public final class Database {
         
         DispatchQueue.utility.async { [self] in
             lock.write {
+                #if DEBUG
+                isPreparing = true
+                #endif
+                
                 block?(self)
+                
+                #if DEBUG
+                isPreparing = false
+                #endif
             }
         }
         
@@ -121,17 +133,36 @@ public final class Database {
     }
     
     public func createOrMigrateIfNeeded(schema: DatabaseSchemaProtocol.Type, willMigrate: (() -> Void)? = nil) throws {
-        guard let location = location,
-              let keyBlock = keyBlock else {
-            preconditionFailure("Database not prepared")
+        #if DEBUG
+        guard isPreparing else {
+            preconditionFailure("Only works on prepare")
         }
+        #endif
         
-        let connection = try DatabaseConnection(location: location, key: keyBlock(), log: log)
-        
-        defer {
-            idles.insert(connection)
+        try performUnsafe {
+            try createOrMigrateIfNeeded(connection: $0, schema: schema, willMigrate: willMigrate)
+            try existsTables(schema, in: $0)
         }
+    }
+    
+    public func recreate(schema: DatabaseSchemaProtocol.Type) throws {
+        #if DEBUG
+        guard isPreparing else {
+            preconditionFailure("Only works on prepare")
+        }
+        #endif
         
+        try performUnsafe {
+            if let fileUrl = fileUrl {
+                try FileManager.default.removeItem(at: fileUrl)
+            }
+            
+            try migrate(schema, in: $0)
+            try existsTables(schema, in: $0)
+        }
+    }
+    
+    private func createOrMigrateIfNeeded(connection: DatabaseConnection, schema: DatabaseSchemaProtocol.Type, willMigrate: (() -> Void)? = nil) throws {
         guard let version: Int = try? connection.scalar(query: "PRAGMA user_version", adaptee: { $0[0] }), version != 0 else {
             try migrate(schema, in: connection)
             return
@@ -147,7 +178,7 @@ public final class Database {
             let description = "Database v\(version) not supported"
             
             log?.debug("🔶 ERROR: %@", description)
-            throw DatabaseError.firstChance(.unknown(description: description))
+            throw DatabaseError.firstChance(.verificationFailed(description: description))
         }
         
         migrations = migrations.filter { $0.version > version }
@@ -164,23 +195,29 @@ public final class Database {
         }
     }
     
-    public func recreate(schema: DatabaseSchemaProtocol.Type) throws {
-        guard let location = location,
-              let keyBlock = keyBlock else {
-            preconditionFailure("Database not prepared")
+    private func delayIfNeeded() {
+        guard let delaySeconds = Query.delaySeconds else {
+            return
         }
         
-        if let fileUrl = fileUrl {
-            try FileManager.default.removeItem(at: fileUrl)
+        Thread.sleep(forTimeInterval: delaySeconds)
+    }
+    
+    private func existsTables(_ schema: DatabaseSchemaProtocol.Type, in connection: DatabaseConnection) throws {
+        var tables = schema.tables
+        
+        try fetch("SELECT name FROM sqlite_master WHERE type='table'", adaptee: { $0[0] }) {
+            tables.remove($0)
         }
         
-        let connection = try DatabaseConnection(location: location, key: keyBlock(), log: log)
-        
-        defer {
-            idles.insert(connection)
+        guard !tables.isEmpty else {
+            return
         }
         
-        try migrate(schema, in: connection)
+        let description = "No table: \(tables.joined(separator: ", "))"
+        
+        log?.debug("🔶 ERROR: %@", description)
+        throw DatabaseError.firstChance(.verificationFailed(description: description))
     }
     
     private func migrate(_ migration: DatabaseMigrationProtocol.Type, in connection: DatabaseConnection) throws {
@@ -221,12 +258,27 @@ public final class Database {
         }
     }
     
-    private func delayIfNeeded() {
-        guard let delaySeconds = Query.delaySeconds else {
-            return
+    private func performUnsafe<T>(action: (_ connection: DatabaseConnection) throws -> T) throws -> T {
+        var connection: DatabaseConnection!
+        
+        defer {
+            idles.insert(connection)
         }
         
-        Thread.sleep(forTimeInterval: delaySeconds)
+        if !idles.isEmpty {
+            connection = idles.removeFirst()
+        }
+        
+        if connection == nil {
+            guard let location = location,
+                  let keyBlock = keyBlock else {
+                preconditionFailure("Database not prepared")
+            }
+            
+            connection = try DatabaseConnection(location: location, key: keyBlock(), log: log)
+        }
+        
+        return try action(connection)
     }
 }
 

@@ -26,4 +26,5 @@ import Foundation
 
 public protocol DatabaseSchemaProtocol: DatabaseMigrationProtocol {
     static var migrations: [DatabaseMigrationProtocol.Type] { get }
+    static var tables: [String] { get }
 }

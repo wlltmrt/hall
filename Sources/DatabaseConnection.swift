@@ -60,7 +60,7 @@ public final class DatabaseConnection {
             throw DatabaseError.firstChance(.unknown(description: "Can't open database: \(path)"))
         }
         
-        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
+        try cipherKey(key)
     }
     
     deinit {
@@ -151,6 +151,17 @@ public final class DatabaseConnection {
         }
         
         return item
+    }
+    
+    private func cipherKey(_ key: String) throws {
+        let tableName = "__hall\(databaseHandle.hashValue)__"
+        
+        try exec(query: "PRAGMA cipher_memory_security=OFF")
+        sqlite3_key(databaseHandle, key, Int32(key.utf8.count))
+        
+        if sqlite3_exec(databaseHandle, "CREATE TABLE \(tableName)(t);DROP TABLE \(tableName)", nil, nil, nil) == SQLITE_NOTADB {
+            throw DatabaseError.verificationFailed(description: "Invalid key")
+        }
     }
     
     private func prepare(to statementHandle: inout OpaquePointer?, query: String) throws {

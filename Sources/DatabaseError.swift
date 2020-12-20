@@ -27,4 +27,5 @@ import Foundation
 public enum DatabaseError: Error {
     case invalidQuery(query: String, description: String)
     case unknown(description: String)
+    case verificationFailed(description: String)
 }
